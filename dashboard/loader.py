@@ -41,6 +41,34 @@ def _hash(fileobj):
     return h
 
 
+def _read_rows(fileobj, filename=''):
+    """Читает первый лист как список строк. Поддерживает и .xlsx (openpyxl), и старый .xls (xlrd)."""
+    import io
+    fileobj.seek(0)
+    data = fileobj.read()
+    fileobj.seek(0)
+    name = (filename or getattr(fileobj, 'name', '') or '').lower()
+    if name.endswith('.xls') and not name.endswith('.xlsx'):
+        import xlrd
+        book = xlrd.open_workbook(file_contents=data)
+        sh = book.sheet_by_index(0)
+        rows = []
+        for r in range(sh.nrows):
+            row = []
+            for c in range(sh.ncols):
+                cell = sh.cell(r, c)
+                if cell.ctype == 3:  # дата в формате Excel
+                    row.append(datetime(*xlrd.xldate_as_tuple(cell.value, book.datemode)))
+                else:
+                    row.append(cell.value if cell.value != '' else None)
+            rows.append(tuple(row))
+        return rows
+    # .xlsx
+    wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
+    ws = wb['Лист_1'] if 'Лист_1' in wb.sheetnames else wb[wb.sheetnames[0]]
+    return list(ws.iter_rows(values_only=True))
+
+
 def _month_cols(header):
     cols, year = {}, None
     for j, c in enumerate(header):
@@ -67,8 +95,7 @@ def load_sales_client(fileobj, filename, user=None):
     h = _hash(fileobj)
     if Upload.objects.filter(kind='sales_client', file_hash=h).exists():
         return {'skipped': True, 'reason': 'Такой файл уже загружен (совпал хеш)'}
-    ws = openpyxl.load_workbook(fileobj, data_only=True)['Лист_1']
-    rows = list(ws.iter_rows(values_only=True))
+    rows = _read_rows(fileobj, filename)
     cols, year = _month_cols(rows[0])
     up = Upload.objects.create(kind='sales_client', filename=filename, file_hash=h,
                                period_year=year, uploaded_by=user)
@@ -103,8 +130,7 @@ def load_sales_sku(fileobj, filename, user=None):
     h = _hash(fileobj)
     if Upload.objects.filter(kind='sales_sku', file_hash=h).exists():
         return {'skipped': True, 'reason': 'Такой файл уже загружен'}
-    ws = openpyxl.load_workbook(fileobj, data_only=True)['Лист_1']
-    rows = list(ws.iter_rows(values_only=True))
+    rows = _read_rows(fileobj, filename)
     cols, year = _month_cols(rows[0])
     up = Upload.objects.create(kind='sales_sku', filename=filename, file_hash=h,
                                period_year=year, uploaded_by=user)
@@ -136,8 +162,7 @@ def load_debt(fileobj, filename, user=None):
     h = _hash(fileobj)
     if Upload.objects.filter(kind='debt', file_hash=h).exists():
         return {'skipped': True, 'reason': 'Такой файл уже загружен'}
-    ws = openpyxl.load_workbook(fileobj, data_only=True)['Лист_1']
-    rows = list(ws.iter_rows(values_only=True))
+    rows = _read_rows(fileobj, filename)
     hdr = next((i for i, r in enumerate(rows) if r[0] and str(r[0]).strip() == 'Покупатель'), None)
     if hdr is None:
         return {'skipped': True, 'reason': 'Не найдена шапка «Покупатель»'}
