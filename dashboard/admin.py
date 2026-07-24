@@ -1,0 +1,35 @@
+from django.contrib import admin
+from .models import Upload, Client, SkuMap, SalesPlan
+
+
+@admin.register(Upload)
+class UploadAdmin(admin.ModelAdmin):
+    list_display = ('kind', 'filename', 'period_year', 'rows_loaded', 'control_sum', 'status', 'uploaded_at')
+    list_filter = ('kind', 'status')
+
+
+@admin.register(Client)
+class ClientAdmin(admin.ModelAdmin):
+    list_display = ('name', 'channel', 'credit_limit', 'excluded')
+    list_filter = ('channel', 'excluded')
+    search_fields = ('name',)
+    list_editable = ('channel', 'excluded')
+
+
+@admin.register(SkuMap)
+class SkuMapAdmin(admin.ModelAdmin):
+    list_display = ('raw_name', 'real_sku', 'line', 'brand_type')
+    list_filter = ('brand_type', 'line')
+    search_fields = ('raw_name', 'real_sku')
+    list_editable = ('real_sku', 'line', 'brand_type')
+
+
+@admin.register(SalesPlan)
+class SalesPlanAdmin(admin.ModelAdmin):
+    list_display = ('year', 'month', 'manager', 'amount', 'updated_at')
+    list_filter = ('year',)
+
+
+admin.site.site_header = 'KICK — админ-панель'
+admin.site.site_title = 'KICK'
+admin.site.index_title = 'Управление данными'

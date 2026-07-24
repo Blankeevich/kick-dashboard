@@ -1,0 +1,26 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Дебиторка{% endblock %}
+{% block content %}
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">Всего должны</div><div class="kv">{{ debt.total|intcomma }} <span class="cur">₽</span></div><div class="kf">{{ debt.count }} должников · на 22.07</div></div>
+  <div class="kpi"><div class="kl">Просрочено</div><div class="kv sm bad">{{ debt.overdue|intcomma }} <span class="cur">₽</span></div><div class="kf bad">{{ debt.share }}%</div></div>
+  <div class="kpi"><div class="kl">Должников</div><div class="kv sm">{{ debt.count }}</div><div class="kf">клиентов с долгом</div></div>
+  <div class="kpi"><div class="kl">Доля просрочки</div><div class="kv sm">{{ debt.share }}<span class="cur">%</span></div><div class="kf">от общего долга</div></div>
+</section>
+<section class="grid">
+  <div class="card wide">
+    <div class="ch"><span>Кто должен</span><small>на 22.07.2026 · менеджер видит только своих</small></div>
+    <table>
+      <thead><tr><th>Клиент</th><th>Долг</th><th>Просрочка</th><th>Срок оплаты</th><th>Менеджер</th></tr></thead>
+      <tbody>
+        {% for d in debtors %}<tr {% if d.overdue_days > 30 %}class="bad"{% endif %}>
+          <td>{{ d.client }}</td><td>{{ d.debt_total|intcomma }} ₽</td>
+          <td>{% if d.overdue_days > 0 %}<span class="pill {% if d.overdue_days > 30 %}red{% else %}amb{% endif %}">{{ d.overdue_days }} дней</span>{% else %}<span class="pill">в сроке</span>{% endif %}</td>
+          <td>{{ d.due_date|date:"d.m.Y"|default:"—" }}</td><td>{{ d.manager }}</td>
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+    <div class="warnbox">Система обнаружила — решение принимает ответственный. Долги меньше 1000 ₽ отфильтрованы.</div>
+  </div>
+</section>
+{% endblock %}

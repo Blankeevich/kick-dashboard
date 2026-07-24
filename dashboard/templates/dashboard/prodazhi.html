@@ -1,0 +1,37 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Продажи{% endblock %}
+{% block content %}
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">Продажи {{ cur_year }}</div><div class="kv">{{ sales_total|intcomma }} <span class="cur">₽</span></div><div class="kf bad">▼ {{ yoy_delta }}% к {{ prev_year }}</div></div>
+  <div class="kpi"><div class="kl">Возвраты</div><div class="kv sm">{{ returns|intcomma }} <span class="cur">₽</span></div><div class="kf">за период</div></div>
+  <div class="kpi"><div class="kl">Контрагентов</div><div class="kv sm">{{ all_clients|length }}</div><div class="kf">купили за период</div></div>
+  <div class="kpi"><div class="kl">Менеджеров</div><div class="kv sm">{{ managers|length }}</div><div class="kf">активных</div></div>
+</section>
+<section class="grid">
+  <div class="card">
+    <div class="ch"><span>Все контрагенты</span><small>{{ all_clients|length }} · прокрутка</small></div>
+    <div class="scrollbox">
+      <table>
+        <thead><tr><th>Контрагент</th><th>Выручка</th><th>Доля</th></tr></thead>
+        <tbody>
+          {% for c in all_clients %}<tr><td>{{ c.name }}</td><td>{{ c.amount|intcomma }} ₽</td><td>{{ c.share }}%</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>По менеджерам</span><small>сумма · клиентов</small></div>
+    <ul class="rows">{% for m in managers %}<li><span class="nm">{{ m.manager }}</span><span class="vl">{{ m.amount|intcomma }} · <span class="q">{{ m.clients }} кл</span></span></li>{% endfor %}</ul>
+  </div>
+  <div class="card wide">
+    <div class="ch"><span>Топ SKU {{ cur_year }}</span><small>сумма с НДС · штук · ср. цена</small></div>
+    <table>
+      <thead><tr><th>SKU</th><th>Выручка</th><th>Штук</th><th>Ср. цена</th></tr></thead>
+      <tbody>
+        {% for s in top_sku %}<tr><td>{{ s.name }}</td><td>{{ s.amount|intcomma }} ₽</td><td>{{ s.qty|intcomma }}</td><td>{{ s.price }} ₽</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    <div class="foot">SKU не фильтруются по клиенту/менеджеру: отчёт по номенклатуре без разбивки по контрагентам</div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Сводка{% endblock %}
+{% block content %}
+<div class="ai">
+  <div class="aic">AI</div>
+  <div>
+    <div class="at">На что обратить внимание</div>
+    <ul class="al">
+      <li>🔴 <div><b>Продажи падают почти вдвое:</b> {{ yoy_delta }}% к прошлому году за 7 месяцев ({{ cur_year }} против {{ prev_year }}).</div></li>
+      {% for d in debtors %}{% if d.overdue_days > 60 %}<li>🔴 <div><b>{{ d.client }}</b> — просрочка {{ d.overdue_days }} дней, долг {{ d.debt_total|intcomma }} ₽.</div></li>{% endif %}{% endfor %}
+    </ul>
+  </div>
+</div>
+
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">Продажи {{ cur_year }}, с НДС</div><div class="kv">{{ sales_total|intcomma }} <span class="cur">₽</span></div><div class="kf bad">▼ {{ yoy_delta }}% к {{ prev_year }}</div></div>
+  <div class="kpi"><div class="kl">Дебиторка</div><div class="kv sm">{{ debt.total|intcomma }} <span class="cur">₽</span></div><div class="kf bad">{{ debt.overdue|intcomma }} просроч · {{ debt.share }}%</div></div>
+  <div class="kpi"><div class="kl">Должников</div><div class="kv sm">{{ debt.count }}</div><div class="kf">просрочка {{ debt.share }}%</div></div>
+  <div class="kpi"><div class="kl">Возвраты</div><div class="kv sm">{{ returns|intcomma }} <span class="cur">₽</span></div><div class="kf">за период</div></div>
+</section>
+
+<section class="grid">
+  <div class="card">
+    <div class="ch"><span>Продажи: {{ cur_year }} к {{ prev_year }}</span></div>
+    <div class="chart">
+      {% for b in yoy_bars %}<div class="col"><div class="bars">
+        <i class="prev" style="height:{{ b.prev_h }}%"></i>
+        <i class="now" style="height:{{ b.now_h }}%"></i>
+      </div><span>{{ b.m }}</span></div>{% endfor %}
+    </div>
+    <div class="foot"><b class="bad">{{ yoy_delta }}%</b> год к году за 7 месяцев</div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>Топ клиентов</span><a class="link" href="{% url 'prodazhi' %}?{{ request.GET.urlencode }}">все →</a></div>
+    <ul class="rows">
+      {% for c in top_clients %}<li><span class="nm">{{ c.name }}</span><span class="vl">{{ c.amount|intcomma }} · {{ c.share }}%</span></li>{% endfor %}
+    </ul>
+    <div class="foot">Полный список всех контрагентов — в разделе «Продажи»</div>
+  </div>
+  <div class="card wide">
+    <div class="ch"><span>Отгрузки по дням</span><small>{{ day.month_name }} {{ cur_year }} · по дате документа</small></div>
+    {% if day_bars %}
+    <div class="day-chart">
+      {% for b in day_bars %}<div class="dc" title="{{ b.d }}: {{ b.amount|intcomma }} ₽"><i style="height:{{ b.h }}%"></i><span>{{ b.d }}</span></div>{% endfor %}
+    </div>
+    {% else %}<div class="foot">Нет данных по дням за выбранный фильтр</div>{% endif %}
+  </div>
+  <div class="card">
+    <div class="ch"><span>По менеджерам</span><small>сумма · клиентов</small></div>
+    <ul class="rows">
+      {% for m in managers %}{% if forloop.counter <= 4 %}<li><span class="nm">{{ m.manager }}</span><span class="vl">{{ m.amount|intcomma }} · <span class="q">{{ m.clients }} кл</span></span></li>{% endif %}{% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <div class="ch"><span>Главные должники</span></div>
+    <ul class="rows">
+      {% for d in debtors %}<li><span class="nm">{{ d.client }}</span><span class="vl">{{ d.debt_total|intcomma }} · {{ d.overdue_days }}дн</span></li>{% endfor %}
+    </ul>
+    <div class="foot">Всего {{ debt.total|intcomma }} ₽ · подробно — «Дебиторка»</div>
+  </div>
+</section>
+{% endblock %}

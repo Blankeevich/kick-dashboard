@@ -1,0 +1,18 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Загрузить данные{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px">
+  <div class="ch"><span>Загрузка выгрузок из 1С</span></div>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div><label style="font-size:12.5px;color:#6b6b70">Продажи по контрагентам (.xlsx)</label><br><input type="file" name="sales_client" accept=".xlsx"></div>
+      <div><label style="font-size:12.5px;color:#6b6b70">Продажи по номенклатуре (.xlsx)</label><br><input type="file" name="sales_sku" accept=".xlsx"></div>
+      <div><label style="font-size:12.5px;color:#6b6b70">Дебиторка по срокам (.xlsx)</label><br><input type="file" name="debt" accept=".xlsx"></div>
+    </div>
+    <button class="btn" style="margin-top:18px" type="submit">Загрузить</button>
+  </form>
+  {% if msg %}<div class="foot"><b>Результат:</b><ul>{% for m in msg %}<li>{{ m }}</li>{% endfor %}</ul></div>{% endif %}
+  <div class="foot">Можно загрузить один или несколько файлов. Повторная загрузка того же файла пропускается. Новая выгрузка года заменяет старую.</div>
+</div>
+{% endblock %}
