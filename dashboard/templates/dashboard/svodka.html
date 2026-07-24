@@ -24,8 +24,8 @@
     <div class="ch"><span>Продажи: {{ cur_year }} к {{ prev_year }}</span></div>
     <div class="chart">
       {% for b in yoy_bars %}<div class="col"><div class="bars">
-        <i class="prev" style="height:{{ b.prev_h }}%"></i>
-        <i class="now" style="height:{{ b.now_h }}%"></i>
+        <i class="prev" style="height:{{ b.prev_h }}%" data-tip="{{ b.m }} {{ prev_year }}: {{ b.prev_v|intcomma }} ₽"></i>
+        <i class="now" style="height:{{ b.now_h }}%" data-tip="{{ b.m }} {{ cur_year }}: {{ b.now_v|intcomma }} ₽"></i>
       </div><span>{{ b.m }}</span></div>{% endfor %}
     </div>
     <div class="foot"><b class="bad">{{ yoy_delta }}%</b> год к году за 7 месяцев</div>
@@ -41,7 +41,7 @@
     <div class="ch"><span>Отгрузки по дням</span><small>{{ day.month_name }} {{ cur_year }} · по дате документа</small></div>
     {% if day_bars %}
     <div class="day-chart">
-      {% for b in day_bars %}<div class="dc" title="{{ b.d }}: {{ b.amount|intcomma }} ₽"><i style="height:{{ b.h }}%"></i><span>{{ b.d }}</span></div>{% endfor %}
+      {% for b in day_bars %}<div class="dc" data-tip="{{ b.d }}: {{ b.amount|intcomma }} ₽"><i style="height:{{ b.h }}%"></i><span>{{ b.d }}</span></div>{% endfor %}
     </div>
     {% else %}<div class="foot">Нет данных по дням за выбранный фильтр</div>{% endif %}
   </div>

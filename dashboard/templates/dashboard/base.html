@@ -85,6 +85,10 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
 .day-chart .dc{flex:1;min-width:8px;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
 .day-chart .dc i{width:70%;background:var(--pu);border-radius:2px 2px 0 0;min-height:2px}
 .day-chart .dc span{font-size:9px;color:var(--ink2)}
+#tip{position:fixed;z-index:1000;background:#151515;color:#fff;font-size:12px;padding:6px 10px;border-radius:8px;pointer-events:none;opacity:0;transition:opacity .1s;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+#tip.on{opacity:1}
+[data-tip]{cursor:default}
+.bars i[data-tip]:hover,.dc[data-tip]:hover i{filter:brightness(1.12)}
 </style>
 </head>
 <body>
@@ -136,5 +140,26 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
     {% block content %}{% endblock %}
   </main>
 </div>
+<div id="tip"></div>
+<script>
+(function(){
+  var tip=document.getElementById('tip');
+  document.addEventListener('mouseover',function(e){
+    var el=e.target.closest('[data-tip]');
+    if(!el){return;}
+    tip.textContent=el.getAttribute('data-tip');
+    tip.classList.add('on');
+  });
+  document.addEventListener('mousemove',function(e){
+    if(!tip.classList.contains('on'))return;
+    var x=e.clientX+12, y=e.clientY-32;
+    if(x+tip.offsetWidth>window.innerWidth)x=e.clientX-tip.offsetWidth-12;
+    tip.style.left=x+'px'; tip.style.top=y+'px';
+  });
+  document.addEventListener('mouseout',function(e){
+    if(e.target.closest('[data-tip]'))tip.classList.remove('on');
+  });
+})();
+</script>
 </body>
 </html>

@@ -49,7 +49,8 @@ def svodka(request):
     c.update({
         'sales_total': s['total'], 'returns': abs(s['returns']),
         'yoy_bars': [{'m': MONTHS[i], 'now_h': round(y['now'][i] / ymax * 100),
-                      'prev_h': round(y['prev'][i] / ymax * 100)} for i in range(12)],
+                      'prev_h': round(y['prev'][i] / ymax * 100),
+                      'now_v': y['now'][i], 'prev_v': y['prev'][i]} for i in range(12)],
         'yoy_delta': round((now7 - prev7) / prev7 * 100),
         'day': day, 'day_bars': [{'d': x['day'], 'h': round(x['amount'] / dmax * 100),
                                   'amount': x['amount']} for x in day['days']],
