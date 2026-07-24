@@ -1,0 +1,23 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}{{ client_name }}{% endblock %}
+{% block content %}
+<div style="margin-bottom:12px"><a href="{% url 'debitorka' %}" class="link">← назад к дебиторке</a></div>
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">Долг клиента</div><div class="kv">{% if debtor_row %}{{ debtor_row.debt_total|intcomma }}{% else %}0{% endif %} <span class="cur">₽</span></div><div class="kf">{{ client_name }}</div></div>
+  <div class="kpi"><div class="kl">Просрочено</div><div class="kv sm {% if debtor_row.debt_overdue %}bad{% endif %}">{% if debtor_row %}{{ debtor_row.debt_overdue|intcomma }}{% else %}0{% endif %} <span class="cur">₽</span></div><div class="kf">{% if debtor_row.overdue_days %}{{ debtor_row.overdue_days }} дней{% else %}в сроке{% endif %}</div></div>
+  <div class="kpi"><div class="kl">Срок оплаты</div><div class="kv sm">{{ debtor_row.due_date|date:"d.m"|default:"—" }}</div><div class="kf">ожидаемая дата</div></div>
+  <div class="kpi"><div class="kl">Менеджер</div><div class="kv sm" style="font-size:15px">{{ debtor_row.manager|default:"—" }}</div></div>
+</section>
+<section class="grid">
+  <div class="card wide">
+    <div class="ch"><span>Реализации клиента</span><small>приблизительно · точная привязка к долгу — после выгрузки расшифровки из 1С</small></div>
+    <table>
+      <thead><tr><th>Дата</th><th>Тип документа</th><th>Сумма</th><th>Год</th></tr></thead>
+      <tbody>
+        {% for s in sales %}<tr><td>{{ s.date_str }}</td><td>{{ s.doc_type }}</td><td>{{ s.amount|intcomma }} ₽</td><td>{{ s.year }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    <div class="warnbox">Здесь показаны все реализации клиента. Чтобы видеть <b>именно неоплаченные документы</b>, формирующие долг, нужна выгрузка «расшифровка дебиторки по документам» из 1С — тогда список будет точным.</div>
+  </div>
+</section>
+{% endblock %}

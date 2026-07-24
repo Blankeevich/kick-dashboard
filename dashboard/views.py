@@ -1,49 +1,60 @@
+from datetime import datetime
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
 from . import metrics, loader
 
-MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']
+MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 CUR_YEAR, PREV_YEAR = 2026, 2025
 
 
+def _pdate(s):
+    try:
+        return datetime.strptime(s, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        return None
+
+
 def _filters(request):
-    """Читаем селекторы из GET."""
-    manager = request.GET.get('manager') or None
-    channel = request.GET.get('channel') or None
-    client = request.GET.get('client') or None
-    return {'manager': manager, 'channel': channel, 'client': client}
+    return {'manager': request.GET.get('manager') or None,
+            'channel': request.GET.get('channel') or None,
+            'client': request.GET.get('client') or None,
+            'date_from': _pdate(request.GET.get('date_from')),
+            'date_to': _pdate(request.GET.get('date_to'))}
 
 
 def _base_ctx(request, page):
     f = _filters(request)
     opts = metrics.filter_options(CUR_YEAR)
-    return {'page': page, 'cur_year': CUR_YEAR, 'prev_year': PREV_YEAR,
-            'f': f, 'opts': opts, 'months': MONTHS,
+    return {'page': page, 'cur_year': CUR_YEAR, 'prev_year': PREV_YEAR, 'f': f, 'opts': opts,
+            'months': MONTHS,
             'sel_manager': f['manager'] or '', 'sel_channel': f['channel'] or '',
-            'sel_client': f['client'] or ''}
+            'sel_client': f['client'] or '',
+            'sel_from': request.GET.get('date_from', ''), 'sel_to': request.GET.get('date_to', ''),
+            'has_period': bool(f['date_from'] and f['date_to'])}
 
 
 @login_required
 def svodka(request):
     c = _base_ctx(request, 'svodka')
     f = c['f']
-    s = metrics.sales_summary(CUR_YEAR, **f)
-    y = metrics.yoy(CUR_YEAR, PREV_YEAR, **f)
+    year = None if c['has_period'] else CUR_YEAR
+    s = metrics.sales_summary(year, **f)
+    y = metrics.yoy(CUR_YEAR, PREV_YEAR, **{k: f[k] for k in ('manager', 'channel', 'client')})
     ymax = max(max(y['now']), max(y['prev'])) or 1
     now7, prev7 = sum(y['now'][:7]), sum(y['prev'][:7]) or 1
-    day = metrics.sales_by_day(CUR_YEAR, **f)
+    day = metrics.sales_by_day(year, **f)
     dmax = max([d['amount'] for d in day['days']], default=1) or 1
     d = metrics.debt_summary(manager=f['manager'], client=f['client'])
     c.update({
         'sales_total': s['total'], 'returns': abs(s['returns']),
-        'yoy_bars': [{'m': MONTHS[i], 'now_h': round(y['now'][i]/ymax*100),
-                      'prev_h': round(y['prev'][i]/ymax*100)} for i in range(12)],
-        'yoy_delta': round((now7-prev7)/prev7*100),
-        'day': day, 'day_bars': [{'d': x['day'], 'h': round(x['amount']/dmax*100),
+        'yoy_bars': [{'m': MONTHS[i], 'now_h': round(y['now'][i] / ymax * 100),
+                      'prev_h': round(y['prev'][i] / ymax * 100)} for i in range(12)],
+        'yoy_delta': round((now7 - prev7) / prev7 * 100),
+        'day': day, 'day_bars': [{'d': x['day'], 'h': round(x['amount'] / dmax * 100),
                                   'amount': x['amount']} for x in day['days']],
-        'top_clients': metrics.top_clients(CUR_YEAR, 5, **f),
-        'managers': metrics.by_manager(CUR_YEAR, **f),
+        'top_clients': metrics.top_clients(year, 5, **f),
+        'managers': metrics.by_manager(year, **f),
         'debt': d, 'debtors': d['debtors'][:4],
     })
     return render(request, 'dashboard/svodka.html', c)
@@ -53,14 +64,15 @@ def svodka(request):
 def prodazhi(request):
     c = _base_ctx(request, 'prodazhi')
     f = c['f']
-    s = metrics.sales_summary(CUR_YEAR, **f)
-    y = metrics.yoy(CUR_YEAR, PREV_YEAR, **f)
+    year = None if c['has_period'] else CUR_YEAR
+    s = metrics.sales_summary(year, **f)
+    y = metrics.yoy(CUR_YEAR, PREV_YEAR, **{k: f[k] for k in ('manager', 'channel', 'client')})
     now7, prev7 = sum(y['now'][:7]), sum(y['prev'][:7]) or 1
     c.update({
         'sales_total': s['total'], 'returns': abs(s['returns']),
-        'yoy_delta': round((now7-prev7)/prev7*100),
-        'all_clients': metrics.all_clients(CUR_YEAR, **f),
-        'managers': metrics.by_manager(CUR_YEAR, **f),
+        'yoy_delta': round((now7 - prev7) / prev7 * 100),
+        'all_clients': metrics.all_clients(year, **f),
+        'managers': metrics.by_manager(year, **f),
         'top_sku': metrics.top_sku(CUR_YEAR, 8),
     })
     return render(request, 'dashboard/prodazhi.html', c)
@@ -70,9 +82,26 @@ def prodazhi(request):
 def debitorka(request):
     c = _base_ctx(request, 'debitorka')
     f = c['f']
-    d = metrics.debt_summary(manager=f['manager'], client=f['client'])
-    c.update({'debt': d, 'debtors': d['debtors']})
+    only_overdue = request.GET.get('overdue') == '1'
+    order = request.GET.get('order', '-debt_total')
+    d = metrics.debt_summary(manager=f['manager'], client=f['client'],
+                             only_overdue=only_overdue, order=order)
+    c.update({'debt': d, 'debtors': d['debtors'],
+              'only_overdue': only_overdue, 'order': order})
     return render(request, 'dashboard/debitorka.html', c)
+
+
+@login_required
+def debtor(request, client):
+    c = _base_ctx(request, 'debitorka')
+    d = metrics.debt_summary(client=client)
+    sales = metrics.client_sales(client)
+    for x in sales:
+        x['date_str'] = x['doc_date'].strftime('%d.%m.%Y') if x['doc_date'] else '—'
+    c.update({'client_name': client, 'debt': d,
+              'debtor_row': d['debtors'][0] if d['debtors'] else None,
+              'sales': sales})
+    return render(request, 'dashboard/debtor.html', c)
 
 
 @login_required

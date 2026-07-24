@@ -9,18 +9,30 @@
 </section>
 <section class="grid">
   <div class="card wide">
-    <div class="ch"><span>Кто должен</span><small>на 22.07.2026 · менеджер видит только своих</small></div>
+    <div class="ch">
+      <span>Кто должен</span>
+      <span style="font-size:11px;font-weight:400;color:var(--ink2)">
+        <a href="?{% if only_overdue %}{% else %}overdue=1{% endif %}" class="link">{% if only_overdue %}показать все{% else %}только просроченные{% endif %}</a>
+        · клик по строке — расшифровка · клик по заголовку — сортировка
+      </span>
+    </div>
     <table>
-      <thead><tr><th>Клиент</th><th>Долг</th><th>Просрочка</th><th>Срок оплаты</th><th>Менеджер</th></tr></thead>
+      <thead><tr>
+        <th><a href="?order=client{% if only_overdue %}&overdue=1{% endif %}" class="thlink">Клиент</a></th>
+        <th><a href="?order=-debt_total{% if only_overdue %}&overdue=1{% endif %}" class="thlink">Долг ↓</a></th>
+        <th><a href="?order=-overdue_days{% if only_overdue %}&overdue=1{% endif %}" class="thlink">Просрочка ↓</a></th>
+        <th><a href="?order=due_date{% if only_overdue %}&overdue=1{% endif %}" class="thlink">Срок оплаты ↑</a></th>
+        <th>Менеджер</th>
+      </tr></thead>
       <tbody>
-        {% for d in debtors %}<tr {% if d.overdue_days > 30 %}class="bad"{% endif %}>
+        {% for d in debtors %}<tr onclick="location.href='{% url 'debtor' d.client %}'" {% if d.overdue_days > 30 %}class="bad"{% endif %}>
           <td>{{ d.client }}</td><td>{{ d.debt_total|intcomma }} ₽</td>
           <td>{% if d.overdue_days > 0 %}<span class="pill {% if d.overdue_days > 30 %}red{% else %}amb{% endif %}">{{ d.overdue_days }} дней</span>{% else %}<span class="pill">в сроке</span>{% endif %}</td>
           <td>{{ d.due_date|date:"d.m.Y"|default:"—" }}</td><td>{{ d.manager }}</td>
         </tr>{% endfor %}
       </tbody>
     </table>
-    <div class="warnbox">Система обнаружила — решение принимает ответственный. Долги меньше 1000 ₽ отфильтрованы.</div>
+    <div class="warnbox">Клик по клиенту — какие реализации формируют долг. Система обнаружила — решение за ответственным. Долги меньше 1000 ₽ отфильтрованы.</div>
   </div>
 </section>
 {% endblock %}

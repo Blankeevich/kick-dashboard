@@ -73,9 +73,14 @@ tr.bad td{background:rgba(194,65,12,.05)}
 .filters select{font:inherit;font-size:12.5px;color:var(--ink);background:var(--sf);border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer;max-width:220px}
 .filters select:focus{outline:none;border-color:var(--pu)}
 .clearf{font-size:12px;color:var(--pu);text-decoration:none}
+.filters input[type=date]{font:inherit;font-size:12.5px;color:var(--ink);background:var(--sf);border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:pointer}
+.filters input[type=date]:focus{outline:none;border-color:var(--pu)}
+.perlbl{font-size:12px;color:var(--ink2);margin-left:4px}.perdash{color:var(--ink2)}
 .scrollbox{max-height:340px;overflow-y:auto}
 .scrollbox::-webkit-scrollbar{width:8px}.scrollbox::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px}
 .link{cursor:pointer;color:var(--pu);font-size:12px;text-decoration:none}
+.thlink{color:var(--ink2);text-decoration:none}.thlink:hover{color:var(--pu)}
+tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2)}
 .day-chart{display:flex;align-items:flex-end;gap:3px;height:120px;overflow-x:auto}
 .day-chart .dc{flex:1;min-width:8px;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
 .day-chart .dc i{width:70%;background:var(--pu);border-radius:2px 2px 0 0;min-height:2px}
@@ -119,7 +124,13 @@ tr.bad td{background:rgba(194,65,12,.05)}
         <option value="">Контрагент: все</option>
         {% for cl in opts.clients %}<option value="{{ cl }}" {% if cl == sel_client %}selected{% endif %}>{{ cl }}</option>{% endfor %}
       </select>
-      {% if sel_manager or sel_channel or sel_client %}<a href="?" class="clearf">сбросить</a>{% endif %}
+      {% if page != 'debitorka' %}
+      <span class="perlbl">Период:</span>
+      <input type="date" name="date_from" value="{{ sel_from }}" onchange="this.form.submit()">
+      <span class="perdash">—</span>
+      <input type="date" name="date_to" value="{{ sel_to }}" onchange="this.form.submit()">
+      {% endif %}
+      {% if sel_manager or sel_channel or sel_client or sel_from or sel_to %}<a href="?" class="clearf">сбросить</a>{% endif %}
     </form>
     {% endif %}
     {% block content %}{% endblock %}
