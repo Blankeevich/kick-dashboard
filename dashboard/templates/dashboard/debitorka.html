@@ -29,9 +29,9 @@
   <div class="card wide">
     <div class="ch">
       <span>Кто должен</span>
-      <span style="font-size:11px;font-weight:400;color:var(--ink2)">
-        <a href="?{% if only_overdue %}{% else %}overdue=1{% endif %}" class="link">{% if only_overdue %}показать все{% else %}только просроченные{% endif %}</a>
-        · клик по строке — расшифровка · клик по заголовку — сортировка
+      <span style="font-size:11px;font-weight:400;color:var(--ink2);display:inline-flex;align-items:center;gap:8px">
+        <a href="?{% if only_overdue %}{% else %}overdue=1{% endif %}" class="perbtn{% if only_overdue %} on{% endif %}">{% if only_overdue %}✓ только просроченные{% else %}только просроченные{% endif %}</a>
+        клик по строке — расшифровка · по заголовку — сортировка
       </span>
     </div>
     <table>

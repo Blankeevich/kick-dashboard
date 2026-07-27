@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
@@ -24,6 +24,19 @@ def _filters(request):
             'date_to': _pdate(request.GET.get('date_to'))}
 
 
+def _period_presets():
+    """Быстрые периоды: неделя / месяц / квартал / год (относительно сегодня)."""
+    t = date.today()
+    q_start = date(t.year, ((t.month - 1) // 3) * 3 + 1, 1)
+    iso = lambda d: d.strftime('%Y-%m-%d')
+    return [
+        {'label': 'Неделя', 'df': iso(t - timedelta(days=6)), 'dt': iso(t)},
+        {'label': 'Месяц', 'df': iso(date(t.year, t.month, 1)), 'dt': iso(t)},
+        {'label': 'Квартал', 'df': iso(q_start), 'dt': iso(t)},
+        {'label': 'Год', 'df': iso(date(t.year, 1, 1)), 'dt': iso(t)},
+    ]
+
+
 def _base_ctx(request, page):
     f = _filters(request)
     opts = metrics.filter_options(CUR_YEAR)
@@ -35,7 +48,8 @@ def _base_ctx(request, page):
             'sel_manager': f['manager'] or '', 'sel_channel': f['channel'] or '',
             'sel_client': f['client'] or '',
             'sel_from': request.GET.get('date_from', ''), 'sel_to': request.GET.get('date_to', ''),
-            'has_period': bool(f['date_from'] and f['date_to'])}
+            'has_period': bool(f['date_from'] and f['date_to']),
+            'presets': _period_presets()}
 
 
 @login_required
