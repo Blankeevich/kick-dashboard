@@ -61,6 +61,7 @@ def svodka(request):
         'top_clients': metrics.top_clients(year, 5, **f),
         'managers': metrics.by_manager(year, **f),
         'debt': d, 'debtors': d['debtors'][:4],
+        'plans': metrics.plan_status(CUR_YEAR),
     })
     return render(request, 'dashboard/svodka.html', c)
 

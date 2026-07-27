@@ -52,11 +52,15 @@
     </ul>
   </div>
   <div class="card">
-    <div class="ch"><span>Главные должники</span></div>
+    <div class="ch"><span>Выполнение плана {{ cur_year }}</span><a class="link" href="{% url 'prodazhi' %}">все →</a></div>
+    {% if plans %}
     <ul class="rows">
-      {% for d in debtors %}<li><span class="nm">{{ d.client }}</span><span class="vl">{{ d.debt_total|intcomma }} · {{ d.overdue_days }}дн</span></li>{% endfor %}
+      {% for p in plans %}<li><span class="nm">{{ p.manager }} · {{ p.month_name }}</span><span class="vl"><b class="{% if p.pct >= 100 %}up{% elif p.pct < 70 %}bad{% endif %}">{{ p.pct }}%</b> · {{ p.fact|intcomma }} / {{ p.plan|intcomma }}</span></li>{% endfor %}
     </ul>
-    <div class="foot">Всего {{ debt.total|intcomma }} ₽ · подробно — «Дебиторка»</div>
+    <div class="foot">Факт / план по менеджерам · задаётся в админке</div>
+    {% else %}
+    <div class="foot">Планы ещё не заданы — добавь в админке, раздел «Планы продаж».</div>
+    {% endif %}
   </div>
 </section>
 {% endblock %}
