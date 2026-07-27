@@ -6,10 +6,13 @@
   <div class="kpi"><div class="kl">Продажи {{ cur_year }}</div><div class="kv sm">{{ total_sales|intcomma }} <span class="cur">₽</span></div><div class="kf">по списку</div></div>
   <div class="kpi"><div class="kl">Долг</div><div class="kv sm">{{ total_debt|intcomma }} <span class="cur">₽</span></div><div class="kf">текущий</div></div>
 </section>
+<form method="get" style="margin:0 0 12px">
+  <input name="q" value="{{ q }}" autofocus placeholder="🔍  Поиск клиента по названию или ИНН…" style="width:100%;font-size:15px;border:1px solid var(--line);border-radius:12px;padding:12px 16px;background:var(--sf)">
+</form>
 <div class="card wide">
   <div class="ch">
-    <span>Все клиенты</span>
-    <form method="get" style="margin:0"><input name="q" value="{{ q }}" placeholder="поиск по названию" style="font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:220px"></form>
+    <span>{% if q %}Найдено: {{ found }}{% else %}Все клиенты{% endif %}</span>
+    <small>{% if q %}<a href="{% url 'clients' %}" class="link">сбросить поиск</a> · {% endif %}всего в базе {{ total_clients }}</small>
   </div>
   <table>
     <thead><tr><th>Клиент</th><th>ИНН</th><th>Канал</th><th>Продажи {{ cur_year }}</th><th>Долг</th><th>Просрочено</th></tr></thead>
