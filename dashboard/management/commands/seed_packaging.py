@@ -12,11 +12,10 @@ class Command(BaseCommand):
     def handle(self, *a, **o):
         path = os.path.join(os.path.dirname(dashboard.__file__), 'data', 'packaging_seed.json')
         items = json.load(open(path, encoding='utf-8'))
-        created = updated = 0
+        # справочник целиком ведётся из seed-файла: чистим и грузим заново,
+        # чтобы переименованные позиции не оставались дублями
+        PackagingItem.objects.all().delete()
         for it in items:
-            obj, is_new = PackagingItem.objects.update_or_create(
-                upak=it['upak'],
-                defaults={'sku': it['sku'], 'series': it['series'], 'stock': it['stock']})
-            created += is_new
-            updated += not is_new
-        self.stdout.write(self.style.SUCCESS(f'Упаковка: создано {created}, обновлено {updated}'))
+            PackagingItem.objects.create(
+                upak=it['upak'], sku=it['sku'], series=it['series'], stock=it['stock'])
+        self.stdout.write(self.style.SUCCESS(f'Упаковка: загружено {len(items)} позиций'))
