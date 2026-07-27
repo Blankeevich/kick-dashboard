@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Upload, Client, SkuMap, SalesPlan, PackagingItem
+from .models import Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine
 
 
 @admin.register(Upload)
@@ -41,3 +41,10 @@ class PackagingItemAdmin(admin.ModelAdmin):
     list_filter = ('series',)
     search_fields = ('upak', 'sku')
     list_editable = ('stock', 'is_active_manual')
+
+
+@admin.register(DebtLine)
+class DebtLineAdmin(admin.ModelAdmin):
+    list_display = ('client', 'ship_date', 'due_date', 'debt_total', 'debt_overdue', 'overdue_days', 'bucket')
+    list_filter = ('bucket',)
+    search_fields = ('client',)

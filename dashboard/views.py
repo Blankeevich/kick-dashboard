@@ -100,12 +100,15 @@ def debitorka(request):
 def debtor(request, client):
     c = _base_ctx(request, 'debitorka')
     d = metrics.debt_summary(client=client)
-    sales = metrics.client_sales(client)
-    for x in sales:
-        x['date_str'] = x['doc_date'].strftime('%d.%m.%Y') if x['doc_date'] else '—'
+    lines = metrics.debt_lines(client)          # реальная расшифровка по реализациям из 1С
+    fallback = []
+    if not lines:                                # расшифровки нет — старый приблизительный список
+        fallback = metrics.client_sales(client)
+        for x in fallback:
+            x['date_str'] = x['doc_date'].strftime('%d.%m.%Y') if x['doc_date'] else '—'
     c.update({'client_name': client, 'debt': d,
               'debtor_row': d['debtors'][0] if d['debtors'] else None,
-              'sales': sales})
+              'lines': lines, 'sales': fallback})
     return render(request, 'dashboard/debtor.html', c)
 
 

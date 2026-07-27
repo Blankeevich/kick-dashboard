@@ -124,6 +124,14 @@ def debt_summary(manager=None, client=None, only_overdue=False, min_amount=1000,
             'count': qs.count(), 'debtors': debtors}
 
 
+def debt_lines(client):
+    """Реализации, формирующие долг клиента (расшифровка из 1С). Просроченные — сверху."""
+    from .models import DebtLine
+    return list(DebtLine.objects.filter(client=client)
+                .order_by('-debt_overdue', 'due_date', '-debt_total')
+                .values('ship_date', 'due_date', 'debt_total', 'debt_overdue', 'overdue_days', 'bucket'))
+
+
 def client_sales(client, limit=100):
     """Реализации клиента (для расшифровки по клику из дебиторки).
     Приблизительно: все продажи клиента с датами. Точная привязка к долгу —

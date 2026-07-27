@@ -10,14 +10,30 @@
 </section>
 <section class="grid">
   <div class="card wide">
-    <div class="ch"><span>Реализации клиента</span><small>приблизительно · точная привязка к долгу — после выгрузки расшифровки из 1С</small></div>
+    <div class="ch"><span>Из чего складывается долг</span><small>реализации по срокам оплаты · просроченные сверху</small></div>
+    {% if lines %}
+    <table>
+      <thead><tr><th>Отгрузка</th><th>Срок оплаты</th><th>Долг по документу</th><th>Просрочено</th><th>Статус</th></tr></thead>
+      <tbody>
+        {% for l in lines %}<tr {% if l.debt_overdue %}class="bad"{% endif %}>
+          <td>{{ l.ship_date|date:"d.m.Y"|default:"—" }}</td>
+          <td>{{ l.due_date|date:"d.m.Y"|default:"—" }}</td>
+          <td>{{ l.debt_total|intcomma }} ₽</td>
+          <td>{% if l.debt_overdue %}<b class="bad">{{ l.debt_overdue|intcomma }} ₽</b>{% else %}—{% endif %}</td>
+          <td>{% if l.overdue_days %}<span class="pill {% if l.overdue_days > 30 %}red{% else %}amb{% endif %}">просрочено {{ l.overdue_days }} дн</span>{% else %}<span class="pill">в сроке</span>{% endif %}</td>
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+    <div class="warnbox">Красным — <b>просроченные</b> документы. Каждая строка — отдельная реализация с собственным сроком оплаты; сумма строк равна общему долгу клиента.</div>
+    {% else %}
     <table>
       <thead><tr><th>Дата</th><th>Тип документа</th><th>Сумма</th><th>Год</th></tr></thead>
       <tbody>
         {% for s in sales %}<tr><td>{{ s.date_str }}</td><td>{{ s.doc_type }}</td><td>{{ s.amount|intcomma }} ₽</td><td>{{ s.year }}</td></tr>{% endfor %}
       </tbody>
     </table>
-    <div class="warnbox">Здесь показаны все реализации клиента. Чтобы видеть <b>именно неоплаченные документы</b>, формирующие долг, нужна выгрузка «расшифровка дебиторки по документам» из 1С — тогда список будет точным.</div>
+    <div class="warnbox">Приблизительный список всех реализаций. Точная расшифровка долга по документам появится после загрузки отчёта «по срокам долга» с детализацией из 1С.</div>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

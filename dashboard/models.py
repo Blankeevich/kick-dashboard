@@ -88,6 +88,23 @@ class DebtFact(models.Model):
         verbose_name_plural = 'Дебиторка (факт)'
 
 
+class DebtLine(models.Model):
+    """Отдельная реализация в составе долга клиента (расшифровка по срокам из 1С)."""
+    upload = models.ForeignKey(Upload, on_delete=models.CASCADE)
+    client = models.CharField('Контрагент', max_length=255, db_index=True)
+    ship_date = models.DateField('Дата отгрузки', null=True, blank=True)
+    due_date = models.DateField('Срок оплаты', null=True, blank=True)
+    debt_total = models.BigIntegerField('Долг по документу', default=0)
+    debt_overdue = models.BigIntegerField('Просрочено', default=0)
+    overdue_days = models.IntegerField('Дней просрочки', default=0)
+    bucket = models.CharField('Корзина срока', max_length=20, blank=True)
+
+    class Meta:
+        verbose_name = 'Реализация в долге'
+        verbose_name_plural = 'Дебиторка по реализациям'
+        indexes = [models.Index(fields=['client'])]
+
+
 # ---------- Справочники (редактируемый слой) ----------
 class Client(models.Model):
     """Справочник клиентов: канал, лимит. Связь с фактом по имени контрагента."""

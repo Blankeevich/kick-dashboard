@@ -8,7 +8,7 @@ import hashlib
 from datetime import datetime
 import openpyxl
 from django.db import transaction
-from .models import Upload, SalesFact, SkuFact, DebtFact
+from .models import Upload, SalesFact, SkuFact, DebtFact, DebtLine
 
 MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 STM = ['вкусвилл', 'самокат', 'старс', 'fancy', 'butman', 'зеленая линия', 'зелёная линия',
@@ -157,17 +157,62 @@ def load_sales_sku(fileobj, filename, user=None):
     return {'skipped': False, 'year': year, 'rows': len(facts), 'total': total}
 
 
+# корзины срока просрочки в новом отчёте (индексы колонок H..M)
+_DEBT_BUCKETS = [(7, 'До 7 дн'), (8, '8–15 дн'), (9, '16–30 дн'),
+                 (10, '31–40 дн'), (11, '41–90 дн'), (12, '>90 дн')]
+
+
+def _load_debt_new(rows, up, filename):
+    """Новый формат «по срокам долга»: строка клиента + под ней реализации.
+    Колонки: 0 Менеджер/Документ · 1 Покупатель · 2 Отгрузка · 3 Срок оплаты ·
+    4 Долг · 5 Просрочено · 6 Дней · 7..12 корзины срока."""
+    m = re.search(r'на (\d{2})\.(\d{2})\.(\d{4})', filename)
+    snap = datetime(int(m.group(3)), int(m.group(2)), int(m.group(1))).date() if m else None
+    hdr = next(i for i, r in enumerate(rows) if len(r) > 1 and r[1] and str(r[1]).strip() == 'Покупатель')
+    facts, lines, total, cur = [], [], 0, None
+    for r in rows[hdr + 2:]:
+        a = str(r[0]).strip() if r[0] else ''
+        b = str(r[1]).strip() if len(r) > 1 and r[1] else ''
+        tot = _num(r[4])
+        if b and not a.startswith(('Реализация', 'Документ', 'Итого')):
+            cur, mgr = b, a
+            if tot:
+                facts.append(DebtFact(upload=up, client=cur, manager=mgr, snapshot_date=snap,
+                                      ship_date=_date(r[2]), due_date=_date(r[3]),
+                                      debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
+                                      overdue_days=int(_num(r[6]) or 0)))
+                total += int(tot)
+        elif a.startswith('Реализация') and cur and tot:
+            bucket = next((nm for idx, nm in _DEBT_BUCKETS if len(r) > idx and _num(r[idx])), '')
+            lines.append(DebtLine(upload=up, client=cur, ship_date=_date(r[2]), due_date=_date(r[3]),
+                                  debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
+                                  overdue_days=int(_num(r[6]) or 0), bucket=bucket))
+    DebtFact.objects.bulk_create(facts, batch_size=1000)
+    DebtLine.objects.bulk_create(lines, batch_size=1000)
+    return len(facts), len(lines), total
+
+
 @transaction.atomic
 def load_debt(fileobj, filename, user=None):
     h = _hash(fileobj)
     if Upload.objects.filter(kind='debt', file_hash=h).exists():
         return {'skipped': True, 'reason': 'Такой файл уже загружен'}
     rows = _read_rows(fileobj, filename)
+    up = Upload.objects.create(kind='debt', filename=filename, file_hash=h, uploaded_by=user)
+    DebtFact.objects.all().delete()   # дебиторка — всегда актуальный снимок
+    DebtLine.objects.all().delete()
+    # новый формат: «Покупатель» стоит во 2-й колонке (есть расшифровка по реализациям)
+    is_new = any(len(r) > 1 and r[1] and str(r[1]).strip() == 'Покупатель' for r in rows[:6])
+    if is_new:
+        nf, nl, total = _load_debt_new(rows, up, filename)
+        up.rows_loaded, up.control_sum = nf, total
+        up.save()
+        return {'skipped': False, 'rows': nf, 'lines': nl, 'total': total}
+    # старый широкий формат: «Покупатель» в 1-й колонке
     hdr = next((i for i, r in enumerate(rows) if r[0] and str(r[0]).strip() == 'Покупатель'), None)
     if hdr is None:
+        up.delete()
         return {'skipped': True, 'reason': 'Не найдена шапка «Покупатель»'}
-    up = Upload.objects.create(kind='debt', filename=filename, file_hash=h, uploaded_by=user)
-    DebtFact.objects.all().delete()  # дебиторка — всегда актуальный снимок
     facts, total = [], 0
     for r in rows[hdr + 1:]:
         client = r[0]
