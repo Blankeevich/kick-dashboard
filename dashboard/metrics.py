@@ -333,7 +333,12 @@ def client_profile(client, year, prev):
     hist = list(DebtClientSnapshot.objects.filter(client=client).order_by('date')
                 .values('date', 'debt_total', 'debt_overdue'))
     info = Client.objects.filter(name=client).first()
-    return {'now': now, 'prev': was, 'sales_total': sum(now), 'prev_total': sum(was),
+    from django.db.models import Count
+    mgr = (SalesFact.objects.filter(client=client).exclude(manager='')
+           .values('manager').annotate(c=Count('id')).order_by('-c').first())
+    owner = mgr['manager'] if mgr else ''
+    return {'owner_manager': owner,
+            'now': now, 'prev': was, 'sales_total': sum(now), 'prev_total': sum(was),
             'debt': d, 'row': row, 'lines': debt_lines(client), 'hist': hist,
             'channel': info.get_channel_display() if info else '—',
             'credit_limit': info.credit_limit if info else None,

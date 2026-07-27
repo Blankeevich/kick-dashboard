@@ -164,6 +164,19 @@ class Client(models.Model):
         return self.name
 
 
+class ManagerProfile(models.Model):
+    """Связь аккаунта с менеджером (как он зовётся в продажах) — для прав на редактирование своих клиентов."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name='Аккаунт')
+    manager = models.CharField('Менеджер (как в продажах)', max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = 'Профиль менеджера'
+        verbose_name_plural = 'Профили менеджеров (права)'
+
+    def __str__(self):
+        return f'{self.user.username} → {self.manager or "—"}'
+
+
 class SkuMap(models.Model):
     """Справочник номенклатуры: карточка 1С → реальный SKU, линейка, тип."""
     TYPES = [('own', 'Свой бренд'), ('private_label', 'СТМ'), ('non_product', 'Непродуктовое')]

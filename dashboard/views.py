@@ -189,7 +189,20 @@ def clients(request):
 
 @login_required
 def client_card(request, client):
+    from .models import Client, ManagerProfile
     p = metrics.client_profile(client, CUR_YEAR, PREV_YEAR)
+    prof = ManagerProfile.objects.filter(user=request.user).first()
+    can_edit = bool(request.user.is_staff or (prof and prof.manager and prof.manager == p['owner_manager']))
+    saved = False
+    if request.method == 'POST' and can_edit:
+        obj, _ = Client.objects.get_or_create(name=client)
+        obj.channel = request.POST.get('channel') or obj.channel
+        lim = request.POST.get('credit_limit', '').replace(' ', '')
+        obj.credit_limit = int(lim) if lim.isdigit() else None
+        obj.note = request.POST.get('note', '')
+        obj.save()
+        p = metrics.client_profile(client, CUR_YEAR, PREV_YEAR)
+        saved = True
     last_sales = Upload.objects.filter(kind='sales_client').order_by('-uploaded_at').first()
     last_debt = Upload.objects.filter(kind='debt').order_by('-uploaded_at').first()
     ymax = max(max(p['now']), max(p['prev'])) or 1
@@ -198,9 +211,12 @@ def client_card(request, client):
              'now_v': p['now'][i], 'prev_v': p['prev'][i]} for i in range(12)]
     hmax = max([h['debt_total'] for h in p['hist']], default=1) or 1
     hist = [{'date': h['date'], 'total': h['debt_total'], 'h': round(h['debt_total'] / hmax * 100)} for h in p['hist']]
+    from .models import Client as _C
     return render(request, 'dashboard/client_card.html', {
         'page': 'clients', 'client_name': client, 'p': p, 'bars': bars, 'hist': hist,
         'cur_year': CUR_YEAR, 'prev_year': PREV_YEAR,
+        'can_edit': can_edit, 'saved': saved, 'channels': _C.CHANNELS,
+        'cur_channel': _C.objects.filter(name=client).values_list('channel', flat=True).first() or 'прочее',
         'last_sales': last_sales, 'last_debt': last_debt})
 
 

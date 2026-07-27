@@ -1,51 +1,26 @@
 {% extends 'dashboard/base.html' %}{% load humanize %}
 {% block title %}{{ client_name }}{% endblock %}
 {% block content %}
-<div style="margin-bottom:12px"><a href="{% url 'clients' %}" class="link">← все клиенты</a></div>
+<div style="margin-bottom:10px"><a href="{% url 'clients' %}" class="link">← все клиенты</a></div>
 <h2 style="margin:0 0 14px;font-size:22px">{{ client_name }}</h2>
+{% if saved %}<div class="foot" style="color:var(--grn);margin-bottom:10px">✓ Сохранено</div>{% endif %}
 
-<div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
-  <!-- ЛЕВАЯ ПОЛОВИНА: графики + долг -->
-  <div style="flex:1 1 540px;min-width:0;display:flex;flex-direction:column;gap:14px">
-    <div class="card">
-      <div class="ch"><span>Продажи по месяцам</span><small>{{ cur_year }} к {{ prev_year }}</small></div>
-      <div class="chart">
-        {% for b in bars %}<div class="col"><div class="bars">
-          <i class="prev" style="height:{{ b.prev_h }}%" data-tip="{{ b.m }} {{ prev_year }}: {{ b.prev_v|intcomma }} ₽"></i>
-          <i class="now" style="height:{{ b.now_h }}%" data-tip="{{ b.m }} {{ cur_year }}: {{ b.now_v|intcomma }} ₽"></i>
-        </div><span>{{ b.m }}</span></div>{% endfor %}
-      </div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+  <!-- ЛЕВАЯ ПОЛОВИНА: карточка (продажи) -->
+  <div class="card" style="margin:0">
+    <div class="ch"><span>Продажи по месяцам</span><small>{{ cur_year }} к {{ prev_year }}</small></div>
+    <div class="chart">
+      {% for b in bars %}<div class="col"><div class="bars">
+        <i class="prev" style="height:{{ b.prev_h }}%" data-tip="{{ b.m }} {{ prev_year }}: {{ b.prev_v|intcomma }} ₽"></i>
+        <i class="now" style="height:{{ b.now_h }}%" data-tip="{{ b.m }} {{ cur_year }}: {{ b.now_v|intcomma }} ₽"></i>
+      </div><span>{{ b.m }}</span></div>{% endfor %}
     </div>
-    {% if hist|length > 1 %}
-    <div class="card">
-      <div class="ch"><span>Динамика долга</span><small>по снимкам дебиторки</small></div>
-      <div class="day-chart">
-        {% for h in hist %}<div class="dc" data-tip="{{ h.date|date:'d.m.Y' }}: {{ h.total|intcomma }} ₽"><i style="height:{{ h.h }}%"></i><span>{{ h.date|date:'d.m' }}</span></div>{% endfor %}
-      </div>
-    </div>
-    {% endif %}
-    <div class="card">
-      <div class="ch"><span>Из чего складывается долг</span><small>{{ p.lines|length }} документов</small></div>
-      {% if p.lines %}
-      <table>
-        <thead><tr><th></th><th>Документ</th><th>Отгрузка</th><th>Срок оплаты</th><th>Долг</th></tr></thead>
-        <tbody>
-          {% for l in p.lines %}<tr {% if l.light == 'red' %}class="bad"{% endif %}>
-            <td><span class="dot {{ l.light }}"></span></td>
-            <td style="font-variant-numeric:tabular-nums">{{ l.doc_no|default:"—" }}</td>
-            <td>{{ l.ship_date|date:"d.m.Y"|default:"—" }}</td>
-            <td>{{ l.due_date|date:"d.m.Y"|default:"—" }}</td>
-            <td>{{ l.debt_total|intcomma }} ₽{% if l.debt_overdue %} <b class="bad">просроч</b>{% endif %}</td>
-          </tr>{% endfor %}
-        </tbody>
-      </table>
-      {% else %}<div class="foot">Долга по этому клиенту нет.</div>{% endif %}
-    </div>
+    <div class="foot">Менеджер клиента: <b>{{ p.owner_manager|default:"—" }}</b>{% if can_edit %} · вы можете редактировать этого клиента{% endif %}</div>
   </div>
 
-  <!-- ПРАВАЯ ПОЛОВИНА: сводка по всему -->
-  <aside style="flex:1 1 300px;max-width:360px;display:flex;flex-direction:column;gap:14px">
-    <div class="card">
+  <!-- ПРАВАЯ ПОЛОВИНА: этажи -->
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div class="card" style="margin:0">
       <div class="ch"><span>Сводка</span></div>
       <ul class="rows">
         <li><span class="nm">Продажи {{ cur_year }}</span><span class="vl">{{ p.sales_total|intcomma }} ₽</span></li>
@@ -56,25 +31,63 @@
         <li><span class="nm">Кредитный лимит</span><span class="vl">{% if p.credit_limit %}{{ p.credit_limit|intcomma }} ₽{% if p.over_limit %} <b class="bad">превышен</b>{% endif %}{% else %}—{% endif %}</span></li>
       </ul>
     </div>
-    <div class="card">
+
+    <div class="card" style="margin:0">
       <div class="ch"><span>Реквизиты</span>{% if p.synced_at %}<small>из 1С: {{ p.synced_at|date:"d.m.Y" }}</small>{% endif %}</div>
       {% if p.inn or p.phone or p.email or p.full_name %}
       <ul class="rows" style="font-size:13px">
-        {% if p.full_name %}<li><span class="nm">Полное имя</span><span class="vl" style="text-align:right;max-width:200px">{{ p.full_name }}</span></li>{% endif %}
+        {% if p.full_name %}<li><span class="nm">Полное имя</span><span class="vl" style="text-align:right;max-width:230px">{{ p.full_name }}</span></li>{% endif %}
         {% if p.inn %}<li><span class="nm">ИНН</span><span class="vl">{{ p.inn }}</span></li>{% endif %}
         {% if p.phone %}<li><span class="nm">Телефон</span><span class="vl">{{ p.phone }}</span></li>{% endif %}
-        {% if p.contact %}<li><span class="nm">Контакт</span><span class="vl" style="text-align:right;max-width:200px">{{ p.contact }}</span></li>{% endif %}
+        {% if p.contact %}<li><span class="nm">Контакт</span><span class="vl" style="text-align:right;max-width:230px">{{ p.contact }}</span></li>{% endif %}
         {% if p.email %}<li><span class="nm">Email</span><span class="vl">{{ p.email }}</span></li>{% endif %}
-        {% if p.address %}<li><span class="nm">Адрес</span><span class="vl" style="text-align:right;max-width:210px;font-size:11px">{{ p.address }}</span></li>{% endif %}
+        {% if p.address %}<li><span class="nm">Адрес</span><span class="vl" style="text-align:right;max-width:240px;font-size:11px">{{ p.address }}</span></li>{% endif %}
       </ul>
+      {% else %}<div class="foot" style="margin-top:0">Реквизиты появятся после загрузки справочника контрагентов из 1С.</div>{% endif %}
+    </div>
+
+    <div class="card" style="margin:0">
+      <div class="ch"><span>{% if can_edit %}Редактировать{% else %}Заметка и настройки{% endif %}</span></div>
+      {% if can_edit %}
+      <form method="post" style="display:flex;flex-direction:column;gap:10px">
+        {% csrf_token %}
+        <label style="font-size:12px;color:var(--ink2)">Канал
+          <select name="channel" style="width:100%;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:3px">
+            {% for code,label in channels %}<option value="{{ code }}" {% if code == cur_channel %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+        <label style="font-size:12px;color:var(--ink2)">Кредитный лимит, ₽
+          <input name="credit_limit" value="{{ p.credit_limit|default_if_none:'' }}" inputmode="numeric" style="width:100%;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:3px">
+        </label>
+        <label style="font-size:12px;color:var(--ink2)">Заметка
+          <textarea name="note" rows="3" style="width:100%;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:3px;resize:vertical">{{ p.note }}</textarea>
+        </label>
+        <button class="btn" type="submit">Сохранить</button>
+      </form>
       {% else %}
-      <div class="foot">Реквизиты появятся после загрузки справочника контрагентов из 1С (форма «Загрузить данные»).</div>
+      <div class="foot" style="margin-top:0">{% if p.note %}{{ p.note }}{% else %}Пусто.{% endif %}<br><span style="color:var(--ink2)">Редактировать может ответственный менеджер или администратор.</span></div>
       {% endif %}
     </div>
-    <div class="card">
-      <div class="ch"><span>Заметка</span></div>
-      <div class="foot" style="margin-top:0">{% if p.note %}{{ p.note }}{% else %}Пусто. Канал, лимит и заметку можно задать в админке → «Справочник клиентов».{% endif %}</div>
-    </div>
-  </aside>
+  </div>
+</div>
+
+<!-- НИЗ: долг во всю ширину, отдельно от главного -->
+<div class="card wide" style="margin-top:14px">
+  <div class="ch"><span>Из чего складывается долг</span><small>{{ p.lines|length }} документов · реализации по срокам</small></div>
+  {% if p.lines %}
+  <table>
+    <thead><tr><th></th><th>Документ</th><th>Отгрузка</th><th>Срок оплаты</th><th>Долг</th><th>Просрочено</th></tr></thead>
+    <tbody>
+      {% for l in p.lines %}<tr {% if l.light == 'red' %}class="bad"{% endif %}>
+        <td><span class="dot {{ l.light }}"></span></td>
+        <td style="font-variant-numeric:tabular-nums">{{ l.doc_no|default:"—" }}</td>
+        <td>{{ l.ship_date|date:"d.m.Y"|default:"—" }}</td>
+        <td>{{ l.due_date|date:"d.m.Y"|default:"—" }}</td>
+        <td>{{ l.debt_total|intcomma }} ₽</td>
+        <td>{% if l.debt_overdue %}<b class="bad">{{ l.debt_overdue|intcomma }} ₽</b>{% else %}—{% endif %}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="foot">Долга по этому клиенту нет.</div>{% endif %}
 </div>
 {% endblock %}

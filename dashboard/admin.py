@@ -1,7 +1,13 @@
 from django import forms
 from django.contrib import admin
 from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
-                     SalesFact, DebtSnapshot)
+                     SalesFact, DebtSnapshot, ManagerProfile)
+
+
+@admin.register(ManagerProfile)
+class ManagerProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'manager')
+    search_fields = ('user__username', 'manager')
 
 MONTHS_RU = [(i, n) for i, n in enumerate(
     ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль',
