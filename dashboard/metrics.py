@@ -337,7 +337,10 @@ def client_profile(client, year, prev):
     mgr = (SalesFact.objects.filter(client=client).exclude(manager='')
            .values('manager').annotate(c=Count('id')).order_by('-c').first())
     owner = mgr['manager'] if mgr else ''
-    return {'owner_manager': owner,
+    year_totals = [{'year': r['year'], 'total': r['s'] or 0} for r in
+                   SalesFact.objects.filter(client=client).values('year')
+                   .annotate(s=Sum('amount')).order_by('-year')]
+    return {'owner_manager': owner, 'year_totals': year_totals,
             'now': now, 'prev': was, 'sales_total': sum(now), 'prev_total': sum(was),
             'debt': d, 'row': row, 'lines': debt_lines(client), 'hist': hist,
             'channel': info.get_channel_display() if info else '—',

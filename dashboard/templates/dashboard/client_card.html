@@ -61,8 +61,7 @@
     <div class="card" style="margin:0">
       <div class="ch"><span>Сводка</span></div>
       <ul class="rows">
-        <li><span class="nm">Продажи {{ cur_year }}</span><span class="vl">{{ p.sales_total|intcomma }} ₽</span></li>
-        <li><span class="nm">Продажи {{ prev_year }}</span><span class="vl">{{ p.prev_total|intcomma }} ₽</span></li>
+        {% for y in p.year_totals %}<li><span class="nm">Продажи {{ y.year }}</span><span class="vl">{{ y.total|intcomma }} ₽</span></li>{% endfor %}
         <li><span class="nm">Текущий долг</span><span class="vl">{{ p.debt.total|intcomma }} ₽</span></li>
         <li><span class="nm">Просрочено</span><span class="vl {% if p.row.debt_overdue %}bad{% endif %}">{% if p.row.debt_overdue %}{{ p.row.debt_overdue|intcomma }} ₽{% else %}—{% endif %}</span></li>
       </ul>
