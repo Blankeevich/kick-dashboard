@@ -8,6 +8,24 @@
   <div class="kpi"><div class="kl">Доля просрочки</div><div class="kv sm">{{ debt.share }}<span class="cur">%</span></div><div class="kf">от общего долга</div></div>
 </section>
 <section class="grid">
+  <div class="card">
+    <div class="ch"><span>Три кошелька</span><small>на {{ aging.ref_date|date:"d.m.Y" }}</small></div>
+    <ul class="rows">
+      <li><span class="nm">🔴 Просрочено</span><span class="vl bad">{{ aging.overdue|intcomma }} ₽</span></li>
+      <li><span class="nm">🟡 К оплате ≤ 7 дней</span><span class="vl">{{ aging.week|intcomma }} ₽</span></li>
+      <li><span class="nm">🟢 В сроке</span><span class="vl">{{ aging.future|intcomma }} ₽</span></li>
+    </ul>
+    <div class="foot">Что горит, что оплатят на неделе, что ещё не подошло по сроку.</div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>Долг по срокам</span><small>сколько зависло по корзинам</small></div>
+    <div class="day-chart">
+      {% for b in aging.buckets %}<div class="dc" data-tip="{{ b.name }}: {{ b.amount|intcomma }} ₽"><i style="height:{{ b.h }}%"></i><span>{{ b.name }}</span></div>{% endfor %}
+    </div>
+    <div class="foot">Хвост «&gt; 90 дней» — почти безнадёжный долг.</div>
+  </div>
+</section>
+<section class="grid">
   <div class="card wide">
     <div class="ch">
       <span>Кто должен</span>
@@ -27,7 +45,7 @@
       </tr></thead>
       <tbody>
         {% for d in debtors %}<tr onclick="location.href='{% url 'debtor' d.client %}'" {% if d.overdue_days > 30 %}class="bad"{% endif %}>
-          <td>{{ d.client }}</td><td>{{ d.debt_total|intcomma }} ₽</td>
+          <td>{{ d.client }}{% if d.over_limit %} <span class="pill red">лимит превышен</span>{% endif %}</td><td>{{ d.debt_total|intcomma }} ₽</td>
           <td>{% if d.debt_overdue %}<b class="bad">{{ d.debt_overdue|intcomma }} ₽</b>{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>
           <td>{% if d.overdue_days > 0 %}<span class="pill {% if d.overdue_days > 30 %}red{% else %}amb{% endif %}">{{ d.overdue_days }} дней</span>{% else %}<span class="pill">в сроке</span>{% endif %}</td>
           <td>{{ d.due_date|date:"d.m.Y"|default:"—" }}</td><td>{{ d.manager }}</td>

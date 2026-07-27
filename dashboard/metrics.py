@@ -119,6 +119,12 @@ def debt_summary(manager=None, client=None, only_overdue=False, min_amount=1000,
         order = '-debt_total'
     debtors = list(qs.order_by(order).values(
         'client', 'manager', 'debt_total', 'debt_overdue', 'overdue_days', 'due_date'))
+    limits = dict(Client.objects.exclude(credit_limit__isnull=True)
+                  .values_list('name', 'credit_limit'))
+    for d in debtors:                       # кредитный лимит и флаг превышения
+        lim = limits.get(d['client'])
+        d['credit_limit'] = lim
+        d['over_limit'] = bool(lim) and d['debt_total'] > lim
     return {'total': total, 'overdue': overdue,
             'share': round(overdue / total * 100, 1) if total else 0,
             'count': qs.count(), 'debtors': debtors}
@@ -127,9 +133,47 @@ def debt_summary(manager=None, client=None, only_overdue=False, min_amount=1000,
 def debt_lines(client):
     """Реализации, формирующие долг клиента (расшифровка из 1С). Просроченные — сверху."""
     from .models import DebtLine
-    return list(DebtLine.objects.filter(client=client)
+    rows = list(DebtLine.objects.filter(client=client)
                 .order_by('-debt_overdue', 'due_date', '-debt_total')
-                .values('ship_date', 'due_date', 'debt_total', 'debt_overdue', 'overdue_days', 'bucket'))
+                .values('doc_no', 'ship_date', 'due_date', 'debt_total',
+                        'debt_overdue', 'overdue_days', 'bucket'))
+    for r in rows:  # светофор: красный >30 дн · жёлтый просрочен · зелёный в сроке
+        r['light'] = 'red' if r['overdue_days'] > 30 else 'amb' if r['overdue_days'] > 0 else 'green'
+    return rows
+
+
+def _debt_ref_date():
+    from django.db.models import Max
+    return DebtFact.objects.aggregate(d=Max('snapshot_date'))['d'] or date.today()
+
+
+def debt_aging(manager=None, client=None):
+    """Кошельки (просрочено / к оплате на неделе / в сроке) и корзины срока долга."""
+    from datetime import timedelta
+    from .models import DebtLine
+    ref = _debt_ref_date()
+    scope = DebtFact.objects.exclude(client__in=_excluded())
+    if manager:
+        scope = scope.filter(manager=manager)
+    if client:
+        scope = scope.filter(client=client)
+    names = set(scope.values_list('client', flat=True))
+    lines = DebtLine.objects.filter(client__in=names)
+    overdue = week = future = 0
+    buckets = {nm: 0 for nm in ['До 7 дн', '8–15 дн', '16–30 дн', '31–40 дн', '41–90 дн', '>90 дн']}
+    horizon = ref + timedelta(days=7)
+    for l in lines.values('debt_total', 'debt_overdue', 'due_date', 'bucket'):
+        overdue += l['debt_overdue']
+        rest = l['debt_total'] - l['debt_overdue']            # ещё не просроченная часть
+        if rest > 0:
+            if l['due_date'] and l['due_date'] <= horizon:
+                week += rest
+            else:
+                future += rest
+        if l['bucket'] in buckets:
+            buckets[l['bucket']] += l['debt_total']
+    return {'ref_date': ref, 'overdue': overdue, 'week': week, 'future': future,
+            'buckets': [{'name': k, 'amount': v} for k, v in buckets.items()]}
 
 
 def client_sales(client, limit=100):

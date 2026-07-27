@@ -91,7 +91,11 @@ def debitorka(request):
     order = request.GET.get('order', '-debt_total')
     d = metrics.debt_summary(manager=f['manager'], client=f['client'],
                              only_overdue=only_overdue, order=order)
-    c.update({'debt': d, 'debtors': d['debtors'],
+    aging = metrics.debt_aging(manager=f['manager'], client=f['client'])
+    bmax = max([b['amount'] for b in aging['buckets']], default=1) or 1
+    for b in aging['buckets']:
+        b['h'] = round(b['amount'] / bmax * 100)
+    c.update({'debt': d, 'debtors': d['debtors'], 'aging': aging,
               'only_overdue': only_overdue, 'order': order})
     return render(request, 'dashboard/debitorka.html', c)
 

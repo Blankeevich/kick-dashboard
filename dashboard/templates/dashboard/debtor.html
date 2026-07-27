@@ -13,18 +13,20 @@
     <div class="ch"><span>Из чего складывается долг</span><small>реализации по срокам оплаты · просроченные сверху</small></div>
     {% if lines %}
     <table>
-      <thead><tr><th>Отгрузка</th><th>Срок оплаты</th><th>Долг по документу</th><th>Просрочено</th><th>Статус</th></tr></thead>
+      <thead><tr><th></th><th>Документ</th><th>Отгрузка</th><th>Срок оплаты</th><th>Долг по документу</th><th>Просрочено</th><th>Статус</th></tr></thead>
       <tbody>
-        {% for l in lines %}<tr {% if l.debt_overdue %}class="bad"{% endif %}>
+        {% for l in lines %}<tr {% if l.light == 'red' %}class="bad"{% endif %}>
+          <td><span class="dot {{ l.light }}"></span></td>
+          <td style="font-variant-numeric:tabular-nums">{{ l.doc_no|default:"—" }}</td>
           <td>{{ l.ship_date|date:"d.m.Y"|default:"—" }}</td>
           <td>{{ l.due_date|date:"d.m.Y"|default:"—" }}</td>
           <td>{{ l.debt_total|intcomma }} ₽</td>
           <td>{% if l.debt_overdue %}<b class="bad">{{ l.debt_overdue|intcomma }} ₽</b>{% else %}—{% endif %}</td>
-          <td>{% if l.overdue_days %}<span class="pill {% if l.overdue_days > 30 %}red{% else %}amb{% endif %}">просрочено {{ l.overdue_days }} дн</span>{% else %}<span class="pill">в сроке</span>{% endif %}</td>
+          <td>{% if l.overdue_days %}<span class="pill {% if l.light == 'red' %}red{% else %}amb{% endif %}">просрочено {{ l.overdue_days }} дн</span>{% else %}<span class="pill">в сроке</span>{% endif %}</td>
         </tr>{% endfor %}
       </tbody>
     </table>
-    <div class="warnbox">Красным — <b>просроченные</b> документы. Каждая строка — отдельная реализация с собственным сроком оплаты; сумма строк равна общему долгу клиента.</div>
+    <div class="warnbox">Светофор слева: 🟢 в сроке · 🟡 просрочено до 30 дней · 🔴 просрочено больше 30 дней. Номер документа — как в 1С, для поиска. Сумма строк равна общему долгу клиента.</div>
     {% else %}
     <table>
       <thead><tr><th>Дата</th><th>Тип документа</th><th>Сумма</th><th>Год</th></tr></thead>

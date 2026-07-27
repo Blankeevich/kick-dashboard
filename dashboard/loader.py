@@ -174,7 +174,7 @@ def _load_debt_new(rows, up, filename):
         a = str(r[0]).strip() if r[0] else ''
         b = str(r[1]).strip() if len(r) > 1 and r[1] else ''
         tot = _num(r[4])
-        if b and not a.startswith(('Реализация', 'Документ', 'Итого')):
+        if b and str(b) != 'Итого':          # строка клиента (Покупатель в колонке B)
             cur, mgr = b, a
             if tot:
                 facts.append(DebtFact(upload=up, client=cur, manager=mgr, snapshot_date=snap,
@@ -182,9 +182,11 @@ def _load_debt_new(rows, up, filename):
                                       debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
                                       overdue_days=int(_num(r[6]) or 0)))
                 total += int(tot)
-        elif a.startswith('Реализация') and cur and tot:
+        elif a and not b and cur and tot and a != 'Итого':   # любой документ под клиентом
             bucket = next((nm for idx, nm in _DEBT_BUCKETS if len(r) > idx and _num(r[idx])), '')
-            lines.append(DebtLine(upload=up, client=cur, ship_date=_date(r[2]), due_date=_date(r[3]),
+            mno = re.search(r'№\s*(\S+)', a)
+            lines.append(DebtLine(upload=up, client=cur, doc_no=(mno.group(1) if mno else ''),
+                                  ship_date=_date(r[2]), due_date=_date(r[3]),
                                   debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
                                   overdue_days=int(_num(r[6]) or 0), bucket=bucket))
     DebtFact.objects.bulk_create(facts, batch_size=1000)
