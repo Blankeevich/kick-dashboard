@@ -2,7 +2,7 @@
 {% block title %}Дебиторка{% endblock %}
 {% block content %}
 <section class="kpis">
-  <div class="kpi hero"><div class="kl">Всего должны</div><div class="kv">{{ debt.total|intcomma }} <span class="cur">₽</span></div><div class="kf">{{ debt.count }} должников · на 22.07</div></div>
+  <div class="kpi hero"><div class="kl">Всего должны</div><div class="kv">{{ debt.total|intcomma }} <span class="cur">₽</span></div><div class="kf">{{ debt.count }} должников · {% if last_debt %}на {{ last_debt.uploaded_at|date:"d.m.Y" }}{% endif %}</div></div>
   <div class="kpi"><div class="kl">Просрочено</div><div class="kv sm bad">{{ debt.overdue|intcomma }} <span class="cur">₽</span></div><div class="kf bad">{{ debt.share }}%</div></div>
   <div class="kpi"><div class="kl">Должников</div><div class="kv sm">{{ debt.count }}</div><div class="kf">клиентов с долгом</div></div>
   <div class="kpi"><div class="kl">Доля просрочки</div><div class="kv sm">{{ debt.share }}<span class="cur">%</span></div><div class="kf">от общего долга</div></div>

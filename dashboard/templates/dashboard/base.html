@@ -112,7 +112,10 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
   <main class="main">
     <header class="top">
       <div><div class="eyebrow">Данные из 1С</div><h1>{% block title %}{% endblock %}</h1></div>
-      <div class="updated">Продажи 2026 · дебиторка на 22.07 · сверка ✓</div>
+      <div class="updated">
+        {% if last_sales %}Продажи обновлены {{ last_sales.uploaded_at|date:"d.m.Y H:i" }}{% else %}Продажи не загружены{% endif %}
+        {% if last_debt %} · дебиторка {{ last_debt.uploaded_at|date:"d.m.Y H:i" }}{% endif %} · сверка ✓
+      </div>
     </header>
     {% if opts %}
     <form method="get" class="filters" id="filters">

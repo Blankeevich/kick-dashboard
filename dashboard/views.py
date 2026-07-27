@@ -3,6 +3,7 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
 from . import metrics, loader
+from .models import Upload
 
 MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 CUR_YEAR, PREV_YEAR = 2026, 2025
@@ -26,7 +27,10 @@ def _filters(request):
 def _base_ctx(request, page):
     f = _filters(request)
     opts = metrics.filter_options(CUR_YEAR)
+    last_sales = Upload.objects.filter(kind='sales_client').order_by('-uploaded_at').first()
+    last_debt = Upload.objects.filter(kind='debt').order_by('-uploaded_at').first()
     return {'page': page, 'cur_year': CUR_YEAR, 'prev_year': PREV_YEAR, 'f': f, 'opts': opts,
+            'last_sales': last_sales, 'last_debt': last_debt,
             'months': MONTHS,
             'sel_manager': f['manager'] or '', 'sel_channel': f['channel'] or '',
             'sel_client': f['client'] or '',
