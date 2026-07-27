@@ -25,7 +25,9 @@ SECRET_KEY = 'django-insecure-zdwb(pklc2_tv2e&y%#+hm^j*)xwo*s8u0@7%_)%-!*kuetyu)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['erp.pkfoodrev.ru', '201.24.114.88', 'localhost', '127.0.0.1']
+
+CSRF_TRUSTED_ORIGINS = ['https://erp.pkfoodrev.ru']
 
 
 # Application definition
