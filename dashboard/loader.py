@@ -390,13 +390,14 @@ def load_contractors(combined, suppliers, user=None):
             continue
         obj, is_new = Client.objects.get_or_create(name=name)
         obj.inn = inn
-        obj.full_name = full
-        obj.manager = r.get(c['manager'], '') or obj.manager
-        obj.phone = r.get(c['phone'], '') or ''
-        obj.contact = r.get(c['contact'], '') or ''
-        obj.email = r.get(c['email'], '') or ''
-        obj.city = r.get(c['city'], '') or ''
-        obj.address = r.get(c['addr'], '') or ''
+        if full and not obj.full_name:
+            obj.full_name = full
+        # реквизиты из 1С только ЗАПОЛНЯЮТ пустое — ручные правки менеджера не затираем
+        for field, col in (('manager', 'manager'), ('phone', 'phone'), ('contact', 'contact'),
+                           ('email', 'email'), ('city', 'city'), ('address', 'addr')):
+            val = (r.get(c[col]) or '').strip()
+            if val and not getattr(obj, field):
+                setattr(obj, field, val)
         obj.synced_at = today
         obj.save()
         created += is_new

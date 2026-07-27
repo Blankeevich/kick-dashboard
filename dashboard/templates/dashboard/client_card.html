@@ -2,23 +2,61 @@
 {% block title %}{{ client_name }}{% endblock %}
 {% block content %}
 <div style="margin-bottom:10px"><a href="{% url 'clients' %}" class="link">← все клиенты</a></div>
-<h2 style="margin:0 0 14px;font-size:22px">{{ client_name }}</h2>
+<h2 style="margin:0 0 4px;font-size:22px">{{ client_name }}</h2>
+<div class="foot" style="margin:0 0 14px">Менеджер клиента: <b>{{ p.owner_manager|default:"—" }}</b>{% if can_edit %} · вы можете редактировать эту карточку{% else %} · редактирует ответственный менеджер или админ{% endif %}{% if p.synced_at %} · из 1С: {{ p.synced_at|date:"d.m.Y" }}{% endif %}</div>
 {% if saved %}<div class="foot" style="color:var(--grn);margin-bottom:10px">✓ Сохранено</div>{% endif %}
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
-  <!-- ЛЕВАЯ ПОЛОВИНА: карточка (продажи) -->
-  <div class="card" style="margin:0">
-    <div class="ch"><span>Продажи по месяцам</span><small>{{ cur_year }} к {{ prev_year }}</small></div>
-    <div class="chart">
-      {% for b in bars %}<div class="col"><div class="bars">
-        <i class="prev" style="height:{{ b.prev_h }}%" data-tip="{{ b.m }} {{ prev_year }}: {{ b.prev_v|intcomma }} ₽"></i>
-        <i class="now" style="height:{{ b.now_h }}%" data-tip="{{ b.m }} {{ cur_year }}: {{ b.now_v|intcomma }} ₽"></i>
-      </div><span>{{ b.m }}</span></div>{% endfor %}
+  <!-- ЛЕВО: КАРТОЧКА КЛИЕНТА (реквизиты + все данные) -->
+  <form method="post" class="card" style="margin:0">
+    {% csrf_token %}
+    <div class="ch"><span>Карточка клиента</span>{% if can_edit %}<button class="btn" type="submit" style="padding:6px 16px">Сохранить</button>{% endif %}</div>
+    {% if not can_edit %}<fieldset disabled style="border:0;padding:0;margin:0">{% endif %}
+    <div class="cform">
+      <div class="frow"><label>Полное наименование</label><input name="full_name" value="{{ p.info.full_name|default:'' }}"></div>
+      <div class="two">
+        <div class="frow"><label>ИНН <span style="color:var(--ink2)">(из 1С)</span></label><input value="{{ p.inn }}" readonly style="color:var(--ink2)"></div>
+        <div class="frow"><label>КПП</label><input name="kpp" value="{{ p.info.kpp|default:'' }}"></div>
+      </div>
+      <div class="two">
+        <div class="frow"><label>ОГРН</label><input name="ogrn" value="{{ p.info.ogrn|default:'' }}"></div>
+        <div class="frow"><label>Статус</label><select name="status">{% for code,label in statuses %}<option value="{{ code }}" {% if p.info and code == p.info.status %}selected{% endif %}>{{ label }}</option>{% endfor %}<option value="" {% if not p.info.status %}selected{% endif %}>—</option></select></div>
+      </div>
+      <div class="two">
+        <div class="frow"><label>Канал</label><select name="channel">{% for code,label in channels %}<option value="{{ code }}" {% if p.info and code == p.info.channel %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="frow"><label>Город / регион</label><input name="city" value="{{ p.info.city|default:'' }}"></div>
+      </div>
+      <div class="sub">Контакты</div>
+      <div class="two">
+        <div class="frow"><label>Телефон</label><input name="phone" value="{{ p.info.phone|default:'' }}"></div>
+        <div class="frow"><label>Email</label><input name="email" value="{{ p.info.email|default:'' }}"></div>
+      </div>
+      <div class="frow"><label>Контактное лицо</label><input name="contact" value="{{ p.info.contact|default:'' }}"></div>
+      <div class="frow"><label>Адрес</label><input name="address" value="{{ p.info.address|default:'' }}"></div>
+      <div class="sub">Банковские реквизиты</div>
+      <div class="frow"><label>Банк</label><input name="bank" value="{{ p.info.bank|default:'' }}"></div>
+      <div class="two">
+        <div class="frow"><label>Расчётный счёт</label><input name="account" value="{{ p.info.account|default:'' }}"></div>
+        <div class="frow"><label>БИК</label><input name="bik" value="{{ p.info.bik|default:'' }}"></div>
+      </div>
+      <div class="sub">Коммерческие условия</div>
+      <div class="two">
+        <div class="frow"><label>Оплата (предоплата / отсрочка N дн)</label><input name="payment_terms" value="{{ p.info.payment_terms|default:'' }}"></div>
+        <div class="frow"><label>Кредитный лимит, ₽</label><input name="credit_limit" inputmode="numeric" value="{{ p.credit_limit|default_if_none:'' }}"></div>
+      </div>
+      <div class="two">
+        <div class="frow"><label>Ретро-бонус / особые условия</label><input name="retro_bonus" value="{{ p.info.retro_bonus|default:'' }}"></div>
+        <div class="frow"><label>Мин. заказ, ₽</label><input name="min_order" inputmode="numeric" value="{{ p.info.min_order|default_if_none:'' }}"></div>
+      </div>
+      <div class="frow"><label>Договор (№, дата, срок)</label><input name="contract" value="{{ p.info.contract|default:'' }}"></div>
+      <div class="frow"><label>Доставка</label><input name="delivery" value="{{ p.info.delivery|default:'' }}"></div>
+      <div class="sub">Заметка менеджера</div>
+      <div class="frow"><textarea name="note" rows="3">{{ p.note }}</textarea></div>
     </div>
-    <div class="foot">Менеджер клиента: <b>{{ p.owner_manager|default:"—" }}</b>{% if can_edit %} · вы можете редактировать этого клиента{% endif %}</div>
-  </div>
+    {% if not can_edit %}</fieldset>{% endif %}
+  </form>
 
-  <!-- ПРАВАЯ ПОЛОВИНА: этажи -->
+  <!-- ПРАВО: АНАЛИТИКА -->
   <div style="display:flex;flex-direction:column;gap:14px">
     <div class="card" style="margin:0">
       <div class="ch"><span>Сводка</span></div>
@@ -27,53 +65,30 @@
         <li><span class="nm">Продажи {{ prev_year }}</span><span class="vl">{{ p.prev_total|intcomma }} ₽</span></li>
         <li><span class="nm">Текущий долг</span><span class="vl">{{ p.debt.total|intcomma }} ₽</span></li>
         <li><span class="nm">Просрочено</span><span class="vl {% if p.row.debt_overdue %}bad{% endif %}">{% if p.row.debt_overdue %}{{ p.row.debt_overdue|intcomma }} ₽{% else %}—{% endif %}</span></li>
-        <li><span class="nm">Канал</span><span class="vl">{{ p.channel }}</span></li>
-        <li><span class="nm">Кредитный лимит</span><span class="vl">{% if p.credit_limit %}{{ p.credit_limit|intcomma }} ₽{% if p.over_limit %} <b class="bad">превышен</b>{% endif %}{% else %}—{% endif %}</span></li>
       </ul>
     </div>
-
     <div class="card" style="margin:0">
-      <div class="ch"><span>Реквизиты</span>{% if p.synced_at %}<small>из 1С: {{ p.synced_at|date:"d.m.Y" }}</small>{% endif %}</div>
-      {% if p.inn or p.phone or p.email or p.full_name %}
-      <ul class="rows" style="font-size:13px">
-        {% if p.full_name %}<li><span class="nm">Полное имя</span><span class="vl" style="text-align:right;max-width:230px">{{ p.full_name }}</span></li>{% endif %}
-        {% if p.inn %}<li><span class="nm">ИНН</span><span class="vl">{{ p.inn }}</span></li>{% endif %}
-        {% if p.phone %}<li><span class="nm">Телефон</span><span class="vl">{{ p.phone }}</span></li>{% endif %}
-        {% if p.contact %}<li><span class="nm">Контакт</span><span class="vl" style="text-align:right;max-width:230px">{{ p.contact }}</span></li>{% endif %}
-        {% if p.email %}<li><span class="nm">Email</span><span class="vl">{{ p.email }}</span></li>{% endif %}
-        {% if p.address %}<li><span class="nm">Адрес</span><span class="vl" style="text-align:right;max-width:240px;font-size:11px">{{ p.address }}</span></li>{% endif %}
-      </ul>
-      {% else %}<div class="foot" style="margin-top:0">Реквизиты появятся после загрузки справочника контрагентов из 1С.</div>{% endif %}
+      <div class="ch"><span>Продажи по месяцам</span><small>{{ cur_year }} к {{ prev_year }}</small></div>
+      <div class="chart">
+        {% for b in bars %}<div class="col"><div class="bars">
+          <i class="prev" style="height:{{ b.prev_h }}%" data-tip="{{ b.m }} {{ prev_year }}: {{ b.prev_v|intcomma }} ₽"></i>
+          <i class="now" style="height:{{ b.now_h }}%" data-tip="{{ b.m }} {{ cur_year }}: {{ b.now_v|intcomma }} ₽"></i>
+        </div><span>{{ b.m }}</span></div>{% endfor %}
+      </div>
     </div>
-
+    {% if hist|length > 1 %}
     <div class="card" style="margin:0">
-      <div class="ch"><span>{% if can_edit %}Редактировать{% else %}Заметка и настройки{% endif %}</span></div>
-      {% if can_edit %}
-      <form method="post" style="display:flex;flex-direction:column;gap:10px">
-        {% csrf_token %}
-        <label style="font-size:12px;color:var(--ink2)">Канал
-          <select name="channel" style="width:100%;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:3px">
-            {% for code,label in channels %}<option value="{{ code }}" {% if code == cur_channel %}selected{% endif %}>{{ label }}</option>{% endfor %}
-          </select>
-        </label>
-        <label style="font-size:12px;color:var(--ink2)">Кредитный лимит, ₽
-          <input name="credit_limit" value="{{ p.credit_limit|default_if_none:'' }}" inputmode="numeric" style="width:100%;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:3px">
-        </label>
-        <label style="font-size:12px;color:var(--ink2)">Заметка
-          <textarea name="note" rows="3" style="width:100%;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:3px;resize:vertical">{{ p.note }}</textarea>
-        </label>
-        <button class="btn" type="submit">Сохранить</button>
-      </form>
-      {% else %}
-      <div class="foot" style="margin-top:0">{% if p.note %}{{ p.note }}{% else %}Пусто.{% endif %}<br><span style="color:var(--ink2)">Редактировать может ответственный менеджер или администратор.</span></div>
-      {% endif %}
+      <div class="ch"><span>Динамика долга</span><small>по снимкам</small></div>
+      <div class="day-chart">
+        {% for h in hist %}<div class="dc" data-tip="{{ h.date|date:'d.m.Y' }}: {{ h.total|intcomma }} ₽"><i style="height:{{ h.h }}%"></i><span>{{ h.date|date:'d.m' }}</span></div>{% endfor %}
+      </div>
     </div>
+    {% endif %}
   </div>
 </div>
 
-<!-- НИЗ: долг во всю ширину, отдельно от главного -->
 <div class="card wide" style="margin-top:14px">
-  <div class="ch"><span>Из чего складывается долг</span><small>{{ p.lines|length }} документов · реализации по срокам</small></div>
+  <div class="ch"><span>Из чего складывается долг</span><small>{{ p.lines|length }} документов</small></div>
   {% if p.lines %}
   <table>
     <thead><tr><th></th><th>Документ</th><th>Отгрузка</th><th>Срок оплаты</th><th>Долг</th><th>Просрочено</th></tr></thead>

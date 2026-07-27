@@ -95,6 +95,15 @@ tr.bad td{background:rgba(194,65,12,.05)}
 .cell.lvl1{background:rgba(120,60,189,.07)}.cell.lvl2{background:rgba(120,60,189,.15)}.cell.lvl3{background:rgba(120,60,189,.26)}
 .cell[data-tip]{cursor:default}
 .cell.clk{cursor:pointer}.cell.clk:hover{border-color:var(--pu);box-shadow:0 0 0 1px var(--pu) inset}
+.cform{display:flex;flex-direction:column;gap:9px;padding-top:4px}
+.cform .two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.frow{display:flex;flex-direction:column;gap:3px;min-width:0}
+.frow label{font-size:11px;color:var(--ink2)}
+.frow input,.frow select,.frow textarea{font:inherit;font-size:13px;color:var(--ink);background:var(--sf);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;box-sizing:border-box;resize:vertical}
+.frow input:focus,.frow select:focus,.frow textarea:focus{outline:none;border-color:var(--pu)}
+.frow input[readonly]{background:var(--sf2)}
+.cform .sub{font-size:11px;font-weight:600;color:var(--pu);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;border-top:1px solid var(--line);padding-top:9px}
+fieldset[disabled] .frow input,fieldset[disabled] .frow select,fieldset[disabled] .frow textarea{background:var(--sf2);color:var(--ink);opacity:1}
 .scrollbox{max-height:340px;overflow-y:auto}
 .scrollbox::-webkit-scrollbar{width:8px}.scrollbox::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px}
 .link{cursor:pointer;color:var(--pu);font-size:12px;text-decoration:none}

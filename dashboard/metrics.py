@@ -344,10 +344,10 @@ def client_profile(client, year, prev):
             'credit_limit': info.credit_limit if info else None,
             'note': info.note if info else '',
             'over_limit': bool(info and info.credit_limit and row and row['debt_total'] > info.credit_limit),
+            'info': info, 'synced_at': info.synced_at if info else None,
             'inn': info.inn if info else '', 'full_name': info.full_name if info else '',
             'phone': info.phone if info else '', 'contact': info.contact if info else '',
-            'email': info.email if info else '', 'address': info.address if info else '',
-            'synced_at': info.synced_at if info else None}
+            'email': info.email if info else '', 'address': info.address if info else ''}
 
 
 def filter_options(year):

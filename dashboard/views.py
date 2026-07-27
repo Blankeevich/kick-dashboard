@@ -196,10 +196,14 @@ def client_card(request, client):
     saved = False
     if request.method == 'POST' and can_edit:
         obj, _ = Client.objects.get_or_create(name=client)
-        obj.channel = request.POST.get('channel') or obj.channel
+        for f in ('channel', 'status', 'full_name', 'kpp', 'ogrn', 'phone', 'contact', 'email',
+                  'city', 'address', 'bank', 'account', 'bik', 'payment_terms', 'retro_bonus',
+                  'contract', 'delivery', 'note'):
+            setattr(obj, f, request.POST.get(f, '').strip())
         lim = request.POST.get('credit_limit', '').replace(' ', '')
         obj.credit_limit = int(lim) if lim.isdigit() else None
-        obj.note = request.POST.get('note', '')
+        mo = request.POST.get('min_order', '').replace(' ', '')
+        obj.min_order = int(mo) if mo.isdigit() else None
         obj.save()
         p = metrics.client_profile(client, CUR_YEAR, PREV_YEAR)
         saved = True
@@ -211,12 +215,10 @@ def client_card(request, client):
              'now_v': p['now'][i], 'prev_v': p['prev'][i]} for i in range(12)]
     hmax = max([h['debt_total'] for h in p['hist']], default=1) or 1
     hist = [{'date': h['date'], 'total': h['debt_total'], 'h': round(h['debt_total'] / hmax * 100)} for h in p['hist']]
-    from .models import Client as _C
     return render(request, 'dashboard/client_card.html', {
         'page': 'clients', 'client_name': client, 'p': p, 'bars': bars, 'hist': hist,
         'cur_year': CUR_YEAR, 'prev_year': PREV_YEAR,
-        'can_edit': can_edit, 'saved': saved, 'channels': _C.CHANNELS,
-        'cur_channel': _C.objects.filter(name=client).values_list('channel', flat=True).first() or 'прочее',
+        'can_edit': can_edit, 'saved': saved, 'channels': Client.CHANNELS, 'statuses': Client.STATUS,
         'last_sales': last_sales, 'last_debt': last_debt})
 
 

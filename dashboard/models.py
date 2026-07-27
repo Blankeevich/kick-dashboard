@@ -146,13 +146,26 @@ class Client(models.Model):
     note = models.TextField('Комментарий', blank=True)
     # реквизиты из справочника 1С (обновляются загрузкой)
     inn = models.CharField('ИНН', max_length=15, blank=True, db_index=True)
+    kpp = models.CharField('КПП', max_length=15, blank=True)
+    ogrn = models.CharField('ОГРН', max_length=20, blank=True)
     full_name = models.CharField('Полное наименование', max_length=400, blank=True)
     manager = models.CharField('Менеджер', max_length=255, blank=True)
     phone = models.CharField('Телефон', max_length=120, blank=True)
     contact = models.CharField('Контактное лицо', max_length=255, blank=True)
     email = models.CharField('Email', max_length=180, blank=True)
-    city = models.CharField('Город', max_length=180, blank=True)
+    city = models.CharField('Город / регион', max_length=180, blank=True)
     address = models.CharField('Адрес', max_length=400, blank=True)
+    bank = models.CharField('Банк', max_length=255, blank=True)
+    account = models.CharField('Расчётный счёт', max_length=40, blank=True)
+    bik = models.CharField('БИК', max_length=15, blank=True)
+    STATUS = [('потенциальный', 'Потенциальный'), ('активный', 'Активный'),
+              ('приостановлен', 'Приостановлен'), ('бывший', 'Бывший')]
+    status = models.CharField('Статус', max_length=15, choices=STATUS, blank=True)
+    payment_terms = models.CharField('Оплата (предоплата / отсрочка N дней)', max_length=120, blank=True)
+    retro_bonus = models.CharField('Ретро-бонус / особые условия', max_length=120, blank=True)
+    contract = models.CharField('Договор (№, дата, срок)', max_length=200, blank=True)
+    delivery = models.CharField('Доставка', max_length=200, blank=True)
+    min_order = models.IntegerField('Мин. заказ, ₽', null=True, blank=True)
     synced_at = models.DateField('Актуализировано из 1С', null=True, blank=True)
 
     class Meta:
