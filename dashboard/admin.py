@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Upload, Client, SkuMap, SalesPlan
+from .models import Upload, Client, SkuMap, SalesPlan, PackagingItem
 
 
 @admin.register(Upload)
@@ -33,3 +33,11 @@ class SalesPlanAdmin(admin.ModelAdmin):
 admin.site.site_header = 'KICK — админ-панель'
 admin.site.site_title = 'KICK'
 admin.site.index_title = 'Управление данными'
+
+
+@admin.register(PackagingItem)
+class PackagingItemAdmin(admin.ModelAdmin):
+    list_display = ('upak', 'series', 'sku', 'stock', 'is_active_manual')
+    list_filter = ('series',)
+    search_fields = ('upak', 'sku')
+    list_editable = ('stock', 'is_active_manual')

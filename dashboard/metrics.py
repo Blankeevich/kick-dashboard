@@ -145,3 +145,49 @@ def filter_options(year):
                          .values_list('client', flat=True)))
     channels = [c[0] for c in Client.CHANNELS]
     return {'managers': managers, 'clients': clients, 'channels': channels}
+
+
+def _last3_sku_qty():
+    """Продажи по SKU в штуках за последние 3 месяца (по SkuFact)."""
+    from django.db.models import Max
+    last = SkuFact.objects.aggregate(y=Max('year'))['y']
+    if not last:
+        return {}, None
+    months = sorted(set(SkuFact.objects.filter(year=last).values_list('month', flat=True)))
+    m3 = months[-3:] if len(months) >= 3 else months
+    qty = {}
+    for r in (SkuFact.objects.filter(year=last, month__in=m3)
+              .values('sku_raw').annotate(q=Sum('qty'))):
+        qty[r['sku_raw']] = r['q'] or 0
+    return qty, len(m3)
+
+
+def packaging_status(series=None, used=None):
+    """Статус упаковки: остаток, расход/мес по продажам, на сколько хватит."""
+    from .models import PackagingItem
+    sku_qty, nmon = _last3_sku_qty()
+    nmon = nmon or 3
+    rows = []
+    for it in PackagingItem.objects.all():
+        q3 = sku_qty.get(it.sku, 0)
+        rate = q3 / nmon if q3 else 0
+        months = (it.stock / rate) if rate > 0 else None
+        is_used = it.is_active_manual if it.is_active_manual is not None else (rate > 0)
+        if series and it.series != series:
+            continue
+        if used == 'yes' and not is_used:
+            continue
+        if used == 'no' and is_used:
+            continue
+        status = ('crit' if months is not None and months < 1
+                  else 'warn' if months is not None and months < 3
+                  else 'ok' if months is not None else 'idle')
+        rows.append({'upak': it.upak, 'series': it.series, 'stock': it.stock,
+                     'rate': round(rate), 'months': months, 'status': status, 'used': is_used})
+    rows.sort(key=lambda r: (r['months'] if r['months'] is not None else 9e9))
+    return rows
+
+
+def packaging_series_list():
+    from .models import PackagingItem
+    return sorted(set(PackagingItem.objects.exclude(series='').values_list('series', flat=True)))

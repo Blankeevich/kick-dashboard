@@ -124,5 +124,20 @@ def upload(request):
     return render(request, 'dashboard/upload.html', {'msg': msg, 'page': 'upload'})
 
 
+@login_required
+def upakovka(request):
+    series = request.GET.get('series') or None
+    used = request.GET.get('used') or None
+    rows = metrics.packaging_status(series=series, used=used)
+    crit = [r for r in rows if r['status'] == 'crit']
+    warn = [r for r in rows if r['status'] == 'warn']
+    return render(request, 'dashboard/upakovka.html', {
+        'page': 'upakovka', 'rows': rows, 'crit': crit, 'warn': warn,
+        'series_list': metrics.packaging_series_list(),
+        'sel_series': series or '', 'sel_used': used or '',
+        'cur_year': CUR_YEAR, 'prev_year': PREV_YEAR,
+    })
+
+
 class Login(LoginView):
     template_name = 'dashboard/login.html'

@@ -141,3 +141,21 @@ class SalesPlan(models.Model):
 
     def __str__(self):
         return f'{self.month:02d}.{self.year} {self.manager or "все"} — {self.amount:,} ₽'
+
+
+class PackagingItem(models.Model):
+    """Справочник упаковки: связь с батончиком (для расхода по продажам) + остаток."""
+    upak = models.CharField('Упаковка', max_length=255, unique=True)
+    sku = models.CharField('Батончик (SKU для расхода)', max_length=255, db_index=True)
+    series = models.CharField('Серия', max_length=40, blank=True)
+    stock = models.BigIntegerField('Остаток', default=0)
+    is_active_manual = models.BooleanField('Используется (ручной флаг)', null=True, blank=True,
+                                           help_text='Пусто = определяется автоматически по продажам')
+
+    class Meta:
+        verbose_name = 'Упаковка'
+        verbose_name_plural = 'Справочник упаковки'
+        ordering = ['series', 'upak']
+
+    def __str__(self):
+        return self.upak
