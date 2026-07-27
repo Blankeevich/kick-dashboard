@@ -11,19 +11,17 @@
     <div class="ch"><span>Кто должен заплатить в этот день</span><small>по сроку оплаты · за какие отгрузки</small></div>
     {% if rows %}
     <table>
-      <thead><tr><th></th><th>Клиент</th><th>Документ</th><th>Отгрузка</th><th>Сумма</th><th>Статус</th></tr></thead>
+      <thead><tr><th>Клиент</th><th>Документ</th><th>Отгрузка</th><th>Сумма</th></tr></thead>
       <tbody>
         {% for r in rows %}<tr {% if r.light == 'red' %}class="bad"{% endif %}>
-          <td><span class="dot {{ r.light }}"></span></td>
           <td><a class="link" href="{% url 'debtor' r.client %}">{{ r.client }}</a></td>
           <td style="font-variant-numeric:tabular-nums">{{ r.doc_no|default:"—" }}</td>
           <td>{{ r.ship_date|date:"d.m.Y"|default:"—" }}</td>
           <td>{{ r.debt_total|intcomma }} ₽</td>
-          <td>{% if r.overdue_days %}<span class="pill {% if r.light == 'red' %}red{% else %}amb{% endif %}">просрочено {{ r.overdue_days }} дн</span>{% else %}<span class="pill">в сроке</span>{% endif %}</td>
         </tr>{% endfor %}
       </tbody>
     </table>
-    <div class="foot">Клик по клиенту — вся его дебиторка. Светофор: 🟢 в сроке · 🟡 просрочено до 30 дней · 🔴 больше 30. Ожидаемые оплаты по сроку из дебиторки.</div>
+    <div class="foot">Клик по клиенту — вся его дебиторка. Суммы — ожидаемые оплаты по сроку из дебиторки за конкретные отгрузки.</div>
     {% else %}
     <div class="foot">На этот день оплат по сроку нет.</div>
     {% endif %}
