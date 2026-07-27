@@ -79,6 +79,7 @@ def prodazhi(request):
         'all_clients': metrics.all_clients(year, **f),
         'managers': metrics.by_manager(year, **f),
         'top_sku': metrics.top_sku(CUR_YEAR, 8),
+        'plans': metrics.plan_status(CUR_YEAR),
     })
     return render(request, 'dashboard/prodazhi.html', c)
 

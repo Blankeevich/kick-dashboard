@@ -190,6 +190,22 @@ def yoy(year, prev, **f):
     return {'now': sales_summary(year, **f2)['by_month'], 'prev': sales_summary(prev, **f2)['by_month']}
 
 
+def plan_status(year):
+    """План/факт продаж по менеджерам и месяцам (план ведётся в админке)."""
+    from .models import SalesPlan
+    out = []
+    for p in SalesPlan.objects.filter(year=year).order_by('month', 'manager'):
+        q = SalesFact.objects.filter(year=year, month=p.month).exclude(client__in=_excluded())
+        if p.manager:
+            q = q.filter(manager=p.manager)
+        fact = q.aggregate(s=Sum('amount'))['s'] or 0
+        out.append({'month': p.month, 'month_name': MONTHS[p.month - 1],
+                    'manager': p.manager or 'все менеджеры', 'plan': p.amount, 'fact': fact,
+                    'pct': round(fact / p.amount * 100) if p.amount else 0,
+                    'remaining': max(p.amount - fact, 0)})
+    return out
+
+
 def filter_options(year):
     managers = sorted(set(SalesFact.objects.exclude(client__in=_excluded())
                           .exclude(manager='').values_list('manager', flat=True)))

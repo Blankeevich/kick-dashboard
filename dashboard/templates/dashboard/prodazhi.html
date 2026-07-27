@@ -24,6 +24,25 @@
     <ul class="rows">{% for m in managers %}<li><span class="nm">{{ m.manager }}</span><span class="vl">{{ m.amount|intcomma }} · <span class="q">{{ m.clients }} кл</span></span></li>{% endfor %}</ul>
   </div>
   <div class="card wide">
+    <div class="ch"><span>Выполнение плана {{ cur_year }}</span><small>план задаётся в админке</small></div>
+    {% if plans %}
+    <table>
+      <thead><tr><th>Месяц</th><th>Менеджер</th><th>План</th><th>Факт</th><th>Выполнение</th></tr></thead>
+      <tbody>
+        {% for p in plans %}<tr>
+          <td>{{ p.month_name }}</td><td>{{ p.manager }}</td>
+          <td>{{ p.plan|intcomma }} ₽</td><td>{{ p.fact|intcomma }} ₽</td>
+          <td><b class="{% if p.pct >= 100 %}up{% elif p.pct < 70 %}bad{% endif %}">{{ p.pct }}%</b>
+            {% if p.pct >= 100 %}<span class="pill">выполнен</span>{% else %}<span class="pill {% if p.pct < 70 %}red{% else %}amb{% endif %}">осталось {{ p.remaining|intcomma }} ₽</span>{% endif %}</td>
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+    <div class="foot">Факт — продажи менеджера за этот месяц. Пустой менеджер в плане = общий план по всем.</div>
+    {% else %}
+    <div class="foot">Планы ещё не заданы. Добавь их в админке → «Планы продаж» — появятся здесь план/факт и % выполнения.</div>
+    {% endif %}
+  </div>
+  <div class="card wide">
     <div class="ch"><span>Топ SKU {{ cur_year }}</span><small>сумма с НДС · штук · ср. цена</small></div>
     <table>
       <thead><tr><th>SKU</th><th>Выручка</th><th>Штук</th><th>Ср. цена</th></tr></thead>
