@@ -1,0 +1,24 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}График оплат{% endblock %}
+{% block content %}
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">Ждём оплат в {{ month_name }}</div><div class="kv">{{ cal.month_total|intcomma }} <span class="cur">₽</span></div><div class="kf">{{ cal.doc_count }} документов по сроку оплаты</div></div>
+  <div class="kpi"><div class="kl">Как читать</div><div class="kv sm" style="font-size:13px;line-height:1.5">наведи на день —<br>сумма и клиенты</div><div class="kf">ожидаемые, не подтверждённые</div></div>
+</section>
+
+<div class="card wide">
+  <div class="calhead">
+    <a class="calnav" href="?ym={{ prev_ym }}">←</a>
+    <b style="font-size:16px;text-transform:capitalize">{{ month_name }} {{ year }}</b>
+    <a class="calnav" href="?ym={{ next_ym }}">→</a>
+  </div>
+  <div class="calgrid">
+    {% for wd in weekdays %}<div class="wd">{{ wd }}</div>{% endfor %}
+    {% for week in cal.weeks %}{% for c in week %}<div class="cell{% if not c.in_month %} out{% endif %}{% if c.today %} today{% endif %}{% if c.in_month and c.lvl %} lvl{{ c.lvl }}{% endif %}"{% if c.tip %} data-tip="{{ c.tip }}"{% endif %}>
+      <span class="dn">{{ c.day }}</span>
+      {% if c.amount %}<span class="amt">{{ c.short }}</span><span class="cnt">{{ c.count }} док</span>{% endif %}
+    </div>{% endfor %}{% endfor %}
+  </div>
+  <div class="foot">Суммы — <b>ожидаемые</b> оплаты по сроку оплаты из дебиторки (не подтверждённые). Наведи на день — сумма и топ-клиенты. Снимок дебиторки{% if last_debt %} от {{ last_debt.uploaded_at|date:"d.m.Y" }}{% endif %}.</div>
+</div>
+{% endblock %}

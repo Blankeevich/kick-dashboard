@@ -190,6 +190,48 @@ def yoy(year, prev, **f):
     return {'now': sales_summary(year, **f2)['by_month'], 'prev': sales_summary(prev, **f2)['by_month']}
 
 
+def _short_money(n):
+    if n >= 1_000_000:
+        return f'{n / 1_000_000:.1f}м'.replace('.0м', 'м')
+    if n >= 1_000:
+        return f'{round(n / 1000)}к'
+    return str(int(n)) if n else ''
+
+
+def payment_calendar(year, month):
+    """Календарь ожидаемых оплат: по сроку оплаты из дебиторки раскладываем документы по дням."""
+    import calendar as _cal
+    from collections import defaultdict
+    from .models import DebtLine
+    by_date = defaultdict(lambda: {'amount': 0, 'count': 0, 'clients': defaultdict(int)})
+    for r in DebtLine.objects.filter(due_date__isnull=False).values('due_date', 'client', 'debt_total'):
+        c = by_date[r['due_date']]
+        c['amount'] += r['debt_total']
+        c['count'] += 1
+        c['clients'][r['client']] += r['debt_total']
+    month_days = [d for d in by_date if d.year == year and d.month == month]
+    maxday = max((by_date[d]['amount'] for d in month_days), default=0) or 1
+    today = date.today()
+    weeks = []
+    for week in _cal.Calendar(firstweekday=0).monthdatescalendar(year, month):
+        row = []
+        for d in week:
+            info = by_date.get(d)
+            amount = info['amount'] if info else 0
+            lvl = 0 if not amount else 1 + min(2, int(amount / maxday * 3 * 0.999))
+            tip = None
+            if amount:
+                top = sorted(info['clients'].items(), key=lambda x: -x[1])[:3]
+                names = ', '.join(c for c, _ in top)
+                tip = (f"{d.strftime('%d.%m')} · {amount:,} ₽ · {info['count']} док · {names}"
+                       .replace(',', ' '))
+            row.append({'day': d.day, 'amount': amount, 'short': _short_money(amount),
+                        'lvl': lvl, 'tip': tip, 'in_month': d.month == month, 'today': d == today})
+        weeks.append(row)
+    month_total = sum(by_date[d]['amount'] for d in month_days)
+    return {'weeks': weeks, 'month_total': month_total, 'doc_count': sum(by_date[d]['count'] for d in month_days)}
+
+
 def plan_status(year=None, manager=None, date_from=None, date_to=None):
     """План/факт продаж по менеджерам и месяцам (план ведётся в админке).
     Учитывает фильтры: период (показываем планы месяцев внутри диапазона) и менеджер."""

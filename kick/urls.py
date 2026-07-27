@@ -8,6 +8,7 @@ urlpatterns = [
     path('', views.svodka, name='svodka'),
     path('prodazhi/', views.prodazhi, name='prodazhi'),
     path('debitorka/', views.debitorka, name='debitorka'),
+    path('oplaty/', views.oplaty, name='oplaty'),
     path('upakovka/', views.upakovka, name='upakovka'),
     path('debitorka/<path:client>/', views.debtor, name='debtor'),
     path('upload/', views.upload, name='upload'),

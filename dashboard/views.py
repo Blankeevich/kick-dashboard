@@ -6,6 +6,8 @@ from . import metrics, loader
 from .models import Upload
 
 MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+MONTHS_FULL = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль',
+               'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь']
 CUR_YEAR, PREV_YEAR = 2026, 2025
 
 
@@ -147,6 +149,26 @@ def upload(request):
                 msg.append(f'{key}: пропущено — {r["reason"]}' if r.get('skipped')
                            else f'{key}: загружено {r["rows"]} строк, сумма {r["total"]:,} ₽')
     return render(request, 'dashboard/upload.html', {'msg': msg, 'page': 'upload'})
+
+
+@login_required
+def oplaty(request):
+    ym = request.GET.get('ym', '')
+    try:
+        y, m = map(int, ym.split('-'))
+        date(y, m, 1)
+    except (ValueError, TypeError):
+        t = date.today()
+        y, m = t.year, t.month
+    cal = metrics.payment_calendar(y, m)
+    prev = date(y, m, 1) - timedelta(days=1)
+    nxt = date(y + (m == 12), (m % 12) + 1, 1)
+    return render(request, 'dashboard/oplaty.html', {
+        'page': 'oplaty', 'cal': cal, 'month_name': MONTHS_FULL[m - 1], 'year': y,
+        'prev_ym': f'{prev.year}-{prev.month:02d}', 'next_ym': f'{nxt.year}-{nxt.month:02d}',
+        'weekdays': ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+        'last_debt': Upload.objects.filter(kind='debt').order_by('-uploaded_at').first(),
+    })
 
 
 @login_required
