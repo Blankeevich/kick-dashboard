@@ -297,26 +297,28 @@ def plan_status(year=None, manager=None, date_from=None, date_to=None):
 
 
 def clients_list(year):
-    """Список клиентов с продажами за год, текущим долгом и каналом."""
+    """Список клиентов: продажи по каждому году, текущий долг, канал. Возвращает (годы, строки)."""
     excl = _excluded()
-    sales = {}
-    for r in SalesFact.objects.filter(year=year).exclude(client__in=excl).values('client').annotate(s=Sum('amount')):
-        sales[r['client']] = r['s'] or 0
+    years = sorted(set(SalesFact.objects.values_list('year', flat=True)), reverse=True)
+    sales_year = {}
+    for r in SalesFact.objects.exclude(client__in=excl).values('client', 'year').annotate(s=Sum('amount')):
+        sales_year[(r['client'], r['year'])] = r['s'] or 0
     debt = {}
     for r in DebtFact.objects.exclude(client__in=excl).values('client').annotate(t=Sum('debt_total'), o=Sum('debt_overdue')):
         debt[r['client']] = (r['t'] or 0, r['o'] or 0)
     dir_rows = {c['name']: c for c in Client.objects.exclude(excluded=True)
                 .values('name', 'channel', 'inn', 'synced_at')}
-    names = set(sales) | set(debt) | set(dir_rows)
+    names = set(k[0] for k in sales_year) | set(debt) | set(dir_rows)
     rows = []
     for n in names:
         info = dir_rows.get(n, {})
-        rows.append({'name': n, 'sales': sales.get(n, 0),
+        by_year = [sales_year.get((n, y), 0) for y in years]
+        rows.append({'name': n, 'by_year': by_year, 'sales': (by_year[0] if by_year else 0),
                      'debt': debt.get(n, (0, 0))[0], 'overdue': debt.get(n, (0, 0))[1],
                      'channel': info.get('channel', '') or '',
                      'inn': info.get('inn', '') or '', 'in_1c': bool(info.get('synced_at'))})
     rows.sort(key=lambda r: -r['sales'])
-    return rows
+    return years, rows
 
 
 def client_profile(client, year, prev):

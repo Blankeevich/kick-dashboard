@@ -15,13 +15,13 @@
     <small>{% if q %}<a href="{% url 'clients' %}" class="link">сбросить поиск</a> · {% endif %}всего в базе {{ total_clients }}</small>
   </div>
   <table>
-    <thead><tr><th>Клиент</th><th>ИНН</th><th>Канал</th><th>Продажи {{ cur_year }}</th><th>Долг</th><th>Просрочено</th></tr></thead>
+    <thead><tr><th>Клиент</th><th>ИНН</th><th>Канал</th>{% for y in years %}<th>Продажи {{ y }}</th>{% endfor %}<th>Долг</th><th>Просрочено</th></tr></thead>
     <tbody>
       {% for r in rows %}<tr onclick="location.href='{% url 'client_card' r.name %}'" style="cursor:pointer">
         <td>{{ r.name }}{% if r.in_1c %} <span class="pill" style="font-size:9px">1С</span>{% endif %}</td>
         <td style="font-variant-numeric:tabular-nums;color:var(--ink2)">{{ r.inn|default:"—" }}</td>
         <td>{% if r.channel %}<span class="pill">{{ r.channel }}</span>{% else %}—{% endif %}</td>
-        <td>{% if r.sales %}{{ r.sales|intcomma }} ₽{% else %}<span style="color:var(--ink2)">нет продаж</span>{% endif %}</td>
+        {% for v in r.by_year %}<td>{% if v %}{{ v|intcomma }} ₽{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>{% endfor %}
         <td>{% if r.debt %}{{ r.debt|intcomma }} ₽{% else %}—{% endif %}</td>
         <td>{% if r.overdue %}<b class="bad">{{ r.overdue|intcomma }} ₽</b>{% else %}—{% endif %}</td>
       </tr>{% endfor %}

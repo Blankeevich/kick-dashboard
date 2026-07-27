@@ -176,12 +176,12 @@ def upload(request):
 @login_required
 def clients(request):
     q = (request.GET.get('q') or '').strip().lower()
-    all_rows = metrics.clients_list(CUR_YEAR)
+    years, all_rows = metrics.clients_list(CUR_YEAR)
     rows = [r for r in all_rows if q in r['name'].lower() or q in r['inn']] if q else all_rows
     last_sales = Upload.objects.filter(kind='sales_client').order_by('-uploaded_at').first()
     last_debt = Upload.objects.filter(kind='debt').order_by('-uploaded_at').first()
     return render(request, 'dashboard/clients.html', {
-        'page': 'clients', 'rows': rows, 'q': request.GET.get('q', ''), 'found': len(rows),
+        'page': 'clients', 'rows': rows, 'years': years, 'q': request.GET.get('q', ''), 'found': len(rows),
         'total_clients': len(all_rows), 'cur_year': CUR_YEAR,
         'total_sales': sum(r['sales'] for r in rows), 'total_debt': sum(r['debt'] for r in rows),
         'last_sales': last_sales, 'last_debt': last_debt})
