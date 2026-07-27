@@ -8,7 +8,8 @@ import hashlib
 from datetime import datetime
 import openpyxl
 from django.db import transaction
-from .models import Upload, SalesFact, SkuFact, DebtFact, DebtLine
+from .models import (Upload, SalesFact, SkuFact, DebtFact, DebtLine,
+                     DebtSnapshot, DebtClientSnapshot, PackagingItem)
 
 MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 STM = ['вкусвилл', 'самокат', 'старс', 'fancy', 'butman', 'зеленая линия', 'зелёная линия',
@@ -242,4 +243,68 @@ def load_debt(fileobj, filename, user=None):
     up.rows_loaded = len(facts)
     up.control_sum = total
     up.save()
+    # история долга (снимок на дату): для динамики «кто растёт / кто гасит»
+    snap_date = facts[0].get('snapshot_date') or datetime.now().date()
+    overdue = sum(f['debt_overdue'] for f in facts)
+    DebtSnapshot.objects.update_or_create(
+        date=snap_date, defaults={'total': total, 'overdue': overdue, 'count': len(facts)})
+    DebtClientSnapshot.objects.filter(date=snap_date).delete()
+    DebtClientSnapshot.objects.bulk_create(
+        [DebtClientSnapshot(date=snap_date, client=f['client'],
+                            debt_total=f['debt_total'], debt_overdue=f['debt_overdue']) for f in facts],
+        batch_size=1000)
     return {'skipped': False, 'rows': len(facts), 'lines': len(lines), 'total': total}
+
+
+# ---------- Снимок упаковки (обновление остатков с сайта) ----------
+def pack_key(name):
+    """Нормализованный ключ имени из снимка упаковки — для сопоставления с справочником."""
+    s = str(name or '').replace('\xa0', ' ').strip().lower()
+    s = re.sub(r'^\d+\s*', '', s)
+    s = s.replace('упаковка', '').replace('"', '')
+    s = re.sub(r'\(.*?\)', '', s)
+    s = re.sub(r'[^а-яёa-z0-9 ]', ' ', s)
+    return re.sub(r'\s+', ' ', s).strip()
+
+
+def load_packaging_snapshot(fileobj, filename, user=None):
+    """Обновляет остатки упаковки из последнего листа файла-снимка.
+    Остаток может стоять в той же строке или со смещением на строку ниже (грязный снимок)."""
+    fileobj.seek(0)
+    try:
+        wb = openpyxl.load_workbook(fileobj, data_only=True)
+    except Exception:
+        return {'skipped': True, 'reason': 'Не удалось открыть файл (нужен .xlsx)'}
+    ws = wb.worksheets[-1]                       # последний лист = самый свежий снимок
+    rows = list(ws.iter_rows(values_only=True))
+    stock_by_key = {}
+    for i, r in enumerate(rows):
+        a = r[0] if len(r) > 0 else None
+        b = r[1] if len(r) > 1 else None
+        if not a:
+            continue
+        val = b
+        if val in (None, 0) and i + 1 < len(rows):
+            a2 = rows[i + 1][0] if len(rows[i + 1]) > 0 else None
+            b2 = rows[i + 1][1] if len(rows[i + 1]) > 1 else None
+            if (a2 is None or str(a2).strip() == '') and b2 not in (None, 0):
+                val = b2
+        num = _num(val)
+        if num is None:
+            continue
+        k = pack_key(a)
+        if k:
+            stock_by_key[k] = int(num)
+    updated, missed = 0, []
+    for it in PackagingItem.objects.all():
+        key = it.snap_key or pack_key(it.upak)
+        if key in stock_by_key:
+            it.stock = stock_by_key[key]
+            it.save(update_fields=['stock'])
+            updated += 1
+        else:
+            missed.append(it.upak)
+    Upload.objects.create(kind='packaging', filename=filename, file_hash=_hash(fileobj),
+                          uploaded_by=user, rows_loaded=updated, note=f'лист {ws.title}')
+    return {'skipped': False, 'sheet': ws.title, 'updated': updated,
+            'total': PackagingItem.objects.count(), 'missed': missed}

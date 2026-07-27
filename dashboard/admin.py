@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib import admin
-from .models import Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine, SalesFact
+from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
+                     SalesFact, DebtSnapshot)
 
 MONTHS_RU = [(i, n) for i, n in enumerate(
     ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль',
@@ -70,3 +71,8 @@ class DebtLineAdmin(admin.ModelAdmin):
     list_display = ('client', 'ship_date', 'due_date', 'debt_total', 'debt_overdue', 'overdue_days', 'bucket')
     list_filter = ('bucket',)
     search_fields = ('client',)
+
+
+@admin.register(DebtSnapshot)
+class DebtSnapshotAdmin(admin.ModelAdmin):
+    list_display = ('date', 'total', 'overdue', 'count')

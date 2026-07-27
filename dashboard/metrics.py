@@ -121,10 +121,14 @@ def debt_summary(manager=None, client=None, only_overdue=False, min_amount=1000,
         'client', 'manager', 'debt_total', 'debt_overdue', 'overdue_days', 'due_date'))
     limits = dict(Client.objects.exclude(credit_limit__isnull=True)
                   .values_list('name', 'credit_limit'))
-    for d in debtors:                       # кредитный лимит и флаг превышения
+    deltas, _prev = debt_client_deltas()
+    for d in debtors:                       # кредитный лимит, флаг превышения, динамика
         lim = limits.get(d['client'])
         d['credit_limit'] = lim
         d['over_limit'] = bool(lim) and d['debt_total'] > lim
+        dl = deltas.get(d['client'])
+        d['delta'] = dl
+        d['delta_abs'] = abs(dl) if dl else 0
     return {'total': total, 'overdue': overdue,
             'share': round(overdue / total * 100, 1) if total else 0,
             'count': qs.count(), 'debtors': debtors}
@@ -174,6 +178,25 @@ def debt_aging(manager=None, client=None):
             buckets[l['bucket']] += l['debt_total']
     return {'ref_date': ref, 'overdue': overdue, 'week': week, 'future': future,
             'buckets': [{'name': k, 'amount': v} for k, v in buckets.items()]}
+
+
+def debt_history(limit=12):
+    """История долга по снимкам (для графика динамики)."""
+    from .models import DebtSnapshot
+    rows = list(DebtSnapshot.objects.order_by('date').values('date', 'total', 'overdue', 'count'))
+    return rows[-limit:]
+
+
+def debt_client_deltas():
+    """Изменение долга по клиентам между двумя последними снимками: >0 растёт, <0 гасит."""
+    from .models import DebtSnapshot, DebtClientSnapshot
+    dates = list(DebtSnapshot.objects.order_by('-date').values_list('date', flat=True)[:2])
+    if len(dates) < 2:
+        return {}, None
+    cur = dict(DebtClientSnapshot.objects.filter(date=dates[0]).values_list('client', 'debt_total'))
+    prev = dict(DebtClientSnapshot.objects.filter(date=dates[1]).values_list('client', 'debt_total'))
+    deltas = {c: cur[c] - prev.get(c, 0) for c in cur}
+    return deltas, dates[1]
 
 
 def client_sales(client, limit=100):

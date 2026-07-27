@@ -14,7 +14,8 @@ class Upload(models.Model):
     """Каждая загрузка файла 1С — с хешем для идемпотентности."""
     KIND = [('sales_client', 'Продажи по контрагентам'),
             ('sales_sku', 'Продажи по номенклатуре'),
-            ('debt', 'Дебиторка')]
+            ('debt', 'Дебиторка'),
+            ('packaging', 'Остатки упаковки')]
     kind = models.CharField('Тип отчёта', max_length=20, choices=KIND)
     filename = models.CharField('Имя файла', max_length=255)
     file_hash = models.CharField('Хеш файла', max_length=64, db_index=True)
@@ -86,6 +87,32 @@ class DebtFact(models.Model):
     class Meta:
         verbose_name = 'Дебиторка'
         verbose_name_plural = 'Дебиторка (факт)'
+
+
+class DebtSnapshot(models.Model):
+    """Снимок дебиторки на дату загрузки — для истории/динамики долга."""
+    date = models.DateField('Дата снимка', unique=True)
+    total = models.BigIntegerField('Долг всего', default=0)
+    overdue = models.BigIntegerField('Просрочено', default=0)
+    count = models.IntegerField('Должников', default=0)
+
+    class Meta:
+        verbose_name = 'Снимок дебиторки'
+        verbose_name_plural = 'История дебиторки (снимки)'
+        ordering = ['-date']
+
+
+class DebtClientSnapshot(models.Model):
+    """Долг клиента на дату снимка — для динамики «кто растёт / кто гасит»."""
+    date = models.DateField('Дата снимка', db_index=True)
+    client = models.CharField('Контрагент', max_length=255, db_index=True)
+    debt_total = models.BigIntegerField('Долг', default=0)
+    debt_overdue = models.BigIntegerField('Просрочено', default=0)
+
+    class Meta:
+        verbose_name = 'Долг клиента (снимок)'
+        verbose_name_plural = 'История долга по клиентам'
+        unique_together = [('date', 'client')]
 
 
 class DebtLine(models.Model):
@@ -167,6 +194,8 @@ class PackagingItem(models.Model):
     sku = models.CharField('Батончик (SKU для расхода)', max_length=255, db_index=True)
     series = models.CharField('Серия', max_length=40, blank=True)
     stock = models.BigIntegerField('Остаток', default=0)
+    snap_key = models.CharField('Ключ снимка', max_length=255, blank=True, db_index=True,
+                                help_text='Нормализованное имя из файла-снимка для авто-обновления остатка')
     is_active_manual = models.BooleanField('Используется (ручной флаг)', null=True, blank=True,
                                            help_text='Пусто = определяется автоматически по продажам')
 

@@ -24,6 +24,15 @@
     </div>
     <div class="foot">Хвост «&gt; 90 дней» — почти безнадёжный долг.</div>
   </div>
+  <div class="card wide">
+    <div class="ch"><span>Динамика долга</span><small>по снимкам · общий долг</small></div>
+    {% if hist_bars|length > 1 %}
+    <div class="day-chart">
+      {% for h in hist_bars %}<div class="dc" data-tip="{{ h.date|date:'d.m.Y' }}: {{ h.total|intcomma }} ₽ · просрочка {{ h.overdue|intcomma }}"><i style="height:{{ h.h }}%"></i><span>{{ h.date|date:'d.m' }}</span></div>{% endfor %}
+    </div>
+    <div class="foot">Как менялся общий долг от снимка к снимку. В таблице ниже колонка «Изменение» — кто растёт, кто гасит.</div>
+    {% else %}<div class="foot">История копится с каждой загрузкой дебиторки — график появится после второго снимка.</div>{% endif %}
+  </div>
 </section>
 <section class="grid">
   <div class="card wide">
@@ -39,6 +48,7 @@
         <th><a href="?order=client{% if only_overdue %}&overdue=1{% endif %}" class="thlink">Клиент</a></th>
         <th><a href="?order=-debt_total{% if only_overdue %}&overdue=1{% endif %}" class="thlink">Долг ↓</a></th>
         <th>Просрочено ₽</th>
+        <th>Изменение</th>
         <th><a href="?order=-overdue_days{% if only_overdue %}&overdue=1{% endif %}" class="thlink">Просрочка ↓</a></th>
         <th><a href="?order=due_date{% if only_overdue %}&overdue=1{% endif %}" class="thlink">Срок оплаты ↑</a></th>
         <th>Менеджер</th>
@@ -47,6 +57,7 @@
         {% for d in debtors %}<tr onclick="location.href='{% url 'debtor' d.client %}'" {% if d.overdue_days > 30 %}class="bad"{% endif %}>
           <td>{{ d.client }}{% if d.over_limit %} <span class="pill red">лимит превышен</span>{% endif %}</td><td>{{ d.debt_total|intcomma }} ₽</td>
           <td>{% if d.debt_overdue %}<b class="bad">{{ d.debt_overdue|intcomma }} ₽</b>{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>
+          <td>{% if d.delta > 0 %}<span class="bad">↑ {{ d.delta_abs|intcomma }}</span>{% elif d.delta < 0 %}<span class="up">↓ {{ d.delta_abs|intcomma }}</span>{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>
           <td>{% if d.overdue_days > 0 %}<span class="pill {% if d.overdue_days > 30 %}red{% else %}amb{% endif %}">{{ d.overdue_days }} дней</span>{% else %}<span class="pill">в сроке</span>{% endif %}</td>
           <td>{{ d.due_date|date:"d.m.Y"|default:"—" }}</td><td>{{ d.manager }}</td>
         </tr>{% endfor %}

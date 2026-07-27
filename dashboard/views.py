@@ -115,8 +115,12 @@ def debitorka(request):
     bmax = max([b['amount'] for b in aging['buckets']], default=1) or 1
     for b in aging['buckets']:
         b['h'] = round(b['amount'] / bmax * 100)
+    hist = metrics.debt_history()
+    hmax = max([h['total'] for h in hist], default=1) or 1
+    hist_bars = [{'date': h['date'], 'total': h['total'], 'overdue': h['overdue'],
+                  'h': round(h['total'] / hmax * 100)} for h in hist]
     c.update({'debt': d, 'debtors': d['debtors'], 'aging': aging,
-              'only_overdue': only_overdue, 'order': order})
+              'hist_bars': hist_bars, 'only_overdue': only_overdue, 'order': order})
     return render(request, 'dashboard/debitorka.html', c)
 
 
@@ -148,6 +152,14 @@ def upload(request):
                 r = fn(f, f.name, request.user)
                 msg.append(f'{key}: пропущено — {r["reason"]}' if r.get('skipped')
                            else f'{key}: загружено {r["rows"]} строк, сумма {r["total"]:,} ₽')
+        fp = request.FILES.get('packaging')
+        if fp:
+            r = loader.load_packaging_snapshot(fp, fp.name, request.user)
+            if r.get('skipped'):
+                msg.append(f'упаковка: пропущено — {r["reason"]}')
+            else:
+                m = f' · не сопоставлено: {len(r["missed"])}' if r['missed'] else ''
+                msg.append(f'упаковка: обновлено остатков {r["updated"]} из {r["total"]} (лист {r["sheet"]}){m}')
     return render(request, 'dashboard/upload.html', {'msg': msg, 'page': 'upload'})
 
 
