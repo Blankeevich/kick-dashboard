@@ -16,9 +16,9 @@ class UploadAdmin(admin.ModelAdmin):
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ('name', 'channel', 'credit_limit', 'excluded')
+    list_display = ('name', 'inn', 'channel', 'credit_limit', 'excluded', 'synced_at')
     list_filter = ('channel', 'excluded')
-    search_fields = ('name',)
+    search_fields = ('name', 'inn', 'full_name')
     list_editable = ('channel', 'excluded')
 
 

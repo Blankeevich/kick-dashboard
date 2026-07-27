@@ -9,7 +9,7 @@ from datetime import datetime
 import openpyxl
 from django.db import transaction
 from .models import (Upload, SalesFact, SkuFact, DebtFact, DebtLine,
-                     DebtSnapshot, DebtClientSnapshot, PackagingItem)
+                     DebtSnapshot, DebtClientSnapshot, PackagingItem, Client)
 
 MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 STM = ['вкусвилл', 'самокат', 'старс', 'fancy', 'butman', 'зеленая линия', 'зелёная линия',
@@ -308,3 +308,100 @@ def load_packaging_snapshot(fileobj, filename, user=None):
                           uploaded_by=user, rows_loaded=updated, note=f'лист {ws.title}')
     return {'skipped': False, 'sheet': ws.title, 'updated': updated,
             'total': PackagingItem.objects.count(), 'missed': missed}
+
+
+# ---------- Справочник контрагентов из 1С (.mxl) ----------
+def _parse_mxl(fileobj):
+    """Разбор родного формата 1С (MOXCEL) в список строк {индекс_колонки: значение}."""
+    fileobj.seek(0)
+    data = fileobj.read()
+    if isinstance(data, bytes):
+        data = data.decode('utf-8', 'ignore')
+    cr = re.compile(r'\{16,\d+,\s*\{1,(?:1,\s*\{"#","((?:[^"\\]|\\.)*)"\}\s*|0)\},0\},(\d+),')
+    rows, cur, last = [], {}, 0
+    for m in cr.finditer(data):
+        v, c = m.group(1), int(m.group(2))
+        if c <= last and cur:
+            rows.append(cur)
+            cur = {}
+        if v is not None:
+            cur[c] = v.strip()
+        last = c
+    if cur:
+        rows.append(cur)
+    return rows
+
+
+def _mxl_cols(rows):
+    """Индексы колонок по строке-заголовку."""
+    hdr = {}
+    for r in rows:
+        if 'ИНН' in r.values() and 'Полное наименование' in r.values():
+            hdr = {v: k for k, v in r.items()}
+            break
+    col = lambda n: next((hdr[k] for k in hdr if k.startswith(n)), None)
+    return {'name': col('Наименование в программе'), 'inn': col('ИНН'),
+            'full': col('Полное наименование'), 'code': col('Код'),
+            'phone': col('Телефон'), 'contact': col('Контактное лицо'),
+            'email': col('Email'), 'manager': col('Менеджер'),
+            'city': col('Город'), 'addr': col('Юридический адрес')}
+
+
+_GOV_RE = re.compile(r'ИФНС|ФНС|ОСФР|ПФР|\bФСС\b|КАЗНАЧ|НАЛОГОВ|МИНИСТ|АДМИНИСТРАЦ|ПЕНСИОН|'
+                     r'\bБАНК\b|\bКБ\b|МОДУЛЬБАНК|ТОЧКА БАНК|ТИНЬКОФ|СБЕРБАНК|\bФОНД\b|УФК\b', re.I)
+_FIO_RE = re.compile(r'^[А-ЯЁ][А-ЯЁа-яё-]+\s+[А-ЯЁ][А-ЯЁа-яё-]+\s+[А-ЯЁ][А-ЯЁа-яё-]+$')
+
+
+def _is_junk(name, full):
+    if not name:
+        return True
+    if _GOV_RE.search(name + ' ' + full):
+        return True
+    if _FIO_RE.match(name) and 'ИП' not in full.upper():   # физлицо-учредитель, не ИП
+        return True
+    return False
+
+
+@transaction.atomic
+def load_contractors(combined, suppliers, user=None):
+    """Клиенты = общий справочник МИНУС поставщики, без гос/банков/учредителей.
+    Обновляет реквизиты в справочнике клиентов, не трогая канал/лимит/исключение/заметку."""
+    from datetime import date
+    comb = _parse_mxl(combined)
+    c = _mxl_cols(comb)
+    if not c['inn'] or not c['name']:
+        return {'skipped': True, 'reason': 'Не распознан формат .mxl (нет колонок ИНН/Наименование)'}
+    sup_rows = _parse_mxl(suppliers)
+    sc = _mxl_cols(sup_rows)
+    sup_inns = {r.get(sc['inn']) for r in sup_rows
+                if re.fullmatch(r'\d{10}|\d{12}', str(r.get(sc['inn'], '')))}
+    created = updated = skipped_junk = 0
+    today = date.today()
+    for r in comb:
+        inn = str(r.get(c['inn'], ''))
+        if not re.fullmatch(r'\d{10}|\d{12}', inn):
+            continue
+        if inn in sup_inns:
+            continue
+        name = r.get(c['name'], '').strip()
+        full = r.get(c['full'], '').strip()
+        if _is_junk(name, full):
+            skipped_junk += 1
+            continue
+        obj, is_new = Client.objects.get_or_create(name=name)
+        obj.inn = inn
+        obj.full_name = full
+        obj.manager = r.get(c['manager'], '') or obj.manager
+        obj.phone = r.get(c['phone'], '') or ''
+        obj.contact = r.get(c['contact'], '') or ''
+        obj.email = r.get(c['email'], '') or ''
+        obj.city = r.get(c['city'], '') or ''
+        obj.address = r.get(c['addr'], '') or ''
+        obj.synced_at = today
+        obj.save()
+        created += is_new
+        updated += not is_new
+    Upload.objects.create(kind='contractors', filename='справочник контрагентов',
+                          file_hash=_hash(combined), uploaded_by=user, rows_loaded=created + updated)
+    return {'skipped': False, 'created': created, 'updated': updated,
+            'junk': skipped_junk, 'suppliers': len(sup_inns)}

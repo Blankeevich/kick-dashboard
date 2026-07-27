@@ -15,7 +15,8 @@ class Upload(models.Model):
     KIND = [('sales_client', 'Продажи по контрагентам'),
             ('sales_sku', 'Продажи по номенклатуре'),
             ('debt', 'Дебиторка'),
-            ('packaging', 'Остатки упаковки')]
+            ('packaging', 'Остатки упаковки'),
+            ('contractors', 'Справочник контрагентов')]
     kind = models.CharField('Тип отчёта', max_length=20, choices=KIND)
     filename = models.CharField('Имя файла', max_length=255)
     file_hash = models.CharField('Хеш файла', max_length=64, db_index=True)
@@ -143,6 +144,16 @@ class Client(models.Model):
     credit_limit = models.BigIntegerField('Кредитный лимит', null=True, blank=True)
     excluded = models.BooleanField('Исключить из аналитики', default=False)
     note = models.TextField('Комментарий', blank=True)
+    # реквизиты из справочника 1С (обновляются загрузкой)
+    inn = models.CharField('ИНН', max_length=15, blank=True, db_index=True)
+    full_name = models.CharField('Полное наименование', max_length=400, blank=True)
+    manager = models.CharField('Менеджер', max_length=255, blank=True)
+    phone = models.CharField('Телефон', max_length=120, blank=True)
+    contact = models.CharField('Контактное лицо', max_length=255, blank=True)
+    email = models.CharField('Email', max_length=180, blank=True)
+    city = models.CharField('Город', max_length=180, blank=True)
+    address = models.CharField('Адрес', max_length=400, blank=True)
+    synced_at = models.DateField('Актуализировано из 1С', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Клиент'

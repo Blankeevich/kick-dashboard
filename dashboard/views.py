@@ -160,6 +160,16 @@ def upload(request):
             else:
                 m = f' · не сопоставлено: {len(r["missed"])}' if r['missed'] else ''
                 msg.append(f'упаковка: обновлено остатков {r["updated"]} из {r["total"]} (лист {r["sheet"]}){m}')
+        ca, cs = request.FILES.get('contractors_all'), request.FILES.get('contractors_sup')
+        if ca and cs:
+            r = loader.load_contractors(ca, cs, request.user)
+            if r.get('skipped'):
+                msg.append(f'контрагенты: пропущено — {r["reason"]}')
+            else:
+                msg.append(f'контрагенты: добавлено {r["created"]}, обновлено {r["updated"]}, '
+                           f'отсеяно мусора {r["junk"]} (поставщиков {r["suppliers"]})')
+        elif ca or cs:
+            msg.append('контрагенты: нужны ОБА файла — общий и поставщики')
     return render(request, 'dashboard/upload.html', {'msg': msg, 'page': 'upload'})
 
 

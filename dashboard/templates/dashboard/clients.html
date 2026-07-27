@@ -12,12 +12,13 @@
     <form method="get" style="margin:0"><input name="q" value="{{ q }}" placeholder="поиск по названию" style="font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:220px"></form>
   </div>
   <table>
-    <thead><tr><th>Клиент</th><th>Канал</th><th>Продажи {{ cur_year }}</th><th>Долг</th><th>Просрочено</th></tr></thead>
+    <thead><tr><th>Клиент</th><th>ИНН</th><th>Канал</th><th>Продажи {{ cur_year }}</th><th>Долг</th><th>Просрочено</th></tr></thead>
     <tbody>
       {% for r in rows %}<tr onclick="location.href='{% url 'client_card' r.name %}'" style="cursor:pointer">
-        <td>{{ r.name }}</td>
+        <td>{{ r.name }}{% if r.in_1c %} <span class="pill" style="font-size:9px">1С</span>{% endif %}</td>
+        <td style="font-variant-numeric:tabular-nums;color:var(--ink2)">{{ r.inn|default:"—" }}</td>
         <td>{% if r.channel %}<span class="pill">{{ r.channel }}</span>{% else %}—{% endif %}</td>
-        <td>{{ r.sales|intcomma }} ₽</td>
+        <td>{% if r.sales %}{{ r.sales|intcomma }} ₽{% else %}<span style="color:var(--ink2)">нет продаж</span>{% endif %}</td>
         <td>{% if r.debt %}{{ r.debt|intcomma }} ₽{% else %}—{% endif %}</td>
         <td>{% if r.overdue %}<b class="bad">{{ r.overdue|intcomma }} ₽</b>{% else %}—{% endif %}</td>
       </tr>{% endfor %}

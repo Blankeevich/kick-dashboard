@@ -305,11 +305,16 @@ def clients_list(year):
     debt = {}
     for r in DebtFact.objects.exclude(client__in=excl).values('client').annotate(t=Sum('debt_total'), o=Sum('debt_overdue')):
         debt[r['client']] = (r['t'] or 0, r['o'] or 0)
-    channels = dict(Client.objects.values_list('name', 'channel'))
-    names = set(sales) | set(debt)
-    rows = [{'name': n, 'sales': sales.get(n, 0),
-             'debt': debt.get(n, (0, 0))[0], 'overdue': debt.get(n, (0, 0))[1],
-             'channel': channels.get(n, '')} for n in names]
+    dir_rows = {c['name']: c for c in Client.objects.exclude(excluded=True)
+                .values('name', 'channel', 'inn', 'synced_at')}
+    names = set(sales) | set(debt) | set(dir_rows)
+    rows = []
+    for n in names:
+        info = dir_rows.get(n, {})
+        rows.append({'name': n, 'sales': sales.get(n, 0),
+                     'debt': debt.get(n, (0, 0))[0], 'overdue': debt.get(n, (0, 0))[1],
+                     'channel': info.get('channel', '') or '',
+                     'inn': info.get('inn', '') or '', 'in_1c': bool(info.get('synced_at'))})
     rows.sort(key=lambda r: -r['sales'])
     return rows
 
@@ -333,7 +338,11 @@ def client_profile(client, year, prev):
             'channel': info.get_channel_display() if info else '—',
             'credit_limit': info.credit_limit if info else None,
             'note': info.note if info else '',
-            'over_limit': bool(info and info.credit_limit and row and row['debt_total'] > info.credit_limit)}
+            'over_limit': bool(info and info.credit_limit and row and row['debt_total'] > info.credit_limit),
+            'inn': info.inn if info else '', 'full_name': info.full_name if info else '',
+            'phone': info.phone if info else '', 'contact': info.contact if info else '',
+            'email': info.email if info else '', 'address': info.address if info else '',
+            'synced_at': info.synced_at if info else None}
 
 
 def filter_options(year):
