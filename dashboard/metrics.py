@@ -171,20 +171,27 @@ def packaging_status(series=None, used=None):
     for it in PackagingItem.objects.all():
         q3 = sku_qty.get(it.sku, 0)
         rate = q3 / nmon if q3 else 0
-        months = (it.stock / rate) if rate > 0 else None
-        is_used = it.is_active_manual if it.is_active_manual is not None else (rate > 0)
+        is_used = it.is_active_manual if it.is_active_manual is not None else (rate > 0 or it.stock < 0)
         if series and it.series != series:
             continue
         if used == 'yes' and not is_used:
             continue
         if used == 'no' and is_used:
             continue
-        status = ('crit' if months is not None and months < 1
-                  else 'warn' if months is not None and months < 3
-                  else 'ok' if months is not None else 'idle')
+        deficit = it.stock < 0
+        if deficit:
+            months = None
+            status = 'crit'
+        else:
+            months = (it.stock / rate) if rate > 0 else None
+            status = ('crit' if months is not None and months < 1
+                      else 'warn' if months is not None and months < 3
+                      else 'ok' if months is not None else 'idle')
         rows.append({'upak': it.upak, 'series': it.series, 'stock': it.stock,
-                     'rate': round(rate), 'months': months, 'status': status, 'used': is_used})
-    rows.sort(key=lambda r: (r['months'] if r['months'] is not None else 9e9))
+                     'rate': round(rate), 'months': months, 'status': status,
+                     'used': is_used, 'deficit': deficit})
+    # сортировка: дефицит → мало месяцев → остальное
+    rows.sort(key=lambda r: (-1 if r['deficit'] else (r['months'] if r['months'] is not None else 9e9)))
     return rows
 
 

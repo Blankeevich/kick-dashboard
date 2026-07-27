@@ -4,7 +4,7 @@
 {% if crit %}
 <div class="warnbox" style="margin-bottom:10px;font-size:13px">
   🔴 <b>Срочно заказать ({{ crit|length }}):</b>
-  {% for r in crit %}{{ r.upak|truncatechars:40 }} ({{ r.months|floatformat:1 }} мес){% if not forloop.last %} · {% endif %}{% endfor %}
+  {% for r in crit %}{{ r.upak|truncatechars:40 }} ({% if r.deficit %}дефицит{% else %}{{ r.months|floatformat:1 }} мес{% endif %}){% if not forloop.last %} · {% endif %}{% endfor %}
 </div>
 {% endif %}
 
@@ -38,9 +38,10 @@
         <td>{{ r.upak }}</td>
         <td>{{ r.stock|intcomma }}</td>
         <td>{{ r.rate|intcomma }}</td>
-        <td>{% if r.months != None %}{{ r.months|floatformat:1 }} мес{% else %}—{% endif %}</td>
+        <td>{% if r.deficit %}<b class="bad">дефицит</b>{% elif r.months != None %}{{ r.months|floatformat:1 }} мес{% else %}—{% endif %}</td>
         <td>
-          {% if r.status == 'crit' %}<span class="pill red">кончается</span>
+          {% if r.deficit %}<span class="pill red">дефицит</span>
+          {% elif r.status == 'crit' %}<span class="pill red">кончается</span>
           {% elif r.status == 'warn' %}<span class="pill amb">мало</span>
           {% elif r.status == 'ok' %}<span class="pill" style="background:rgba(47,168,79,.12);color:#2fa84f">хватает</span>
           {% else %}<span class="pill">не в обороте</span>{% endif %}
