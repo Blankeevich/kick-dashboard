@@ -1,3 +1,31 @@
+"""Тесты дебиторки: разбор нового формата и защита от обнуления кривым файлом."""
 from django.test import TestCase
+from dashboard.loader import _parse_debt_new, _parse_debt_old
 
-# Create your tests here.
+
+class DebtParserTests(TestCase):
+    def test_new_format_parses_client_and_lines(self):
+        rows = [
+            ['Менеджер', 'Покупатель', 'Отгрузка', 'Оплата', 'Долг', 'Просроч', 'Дней',
+             'До 7', '8-15', '16-30', '31-40', '41-90', '>90'],
+            ['Документ', '', '', '', '', '', '', '', '', '', '', '', ''],
+            ['Иванов', 'ООО Ромашка', '01.05.2026', '10.05.2026', 1000, 1000, 20,
+             '', '', 1000, '', '', ''],
+            ['Реализация (акт) № ФР1 от 01.05.2026', '', '01.05.2026', '10.05.2026',
+             600, 600, 20, '', '', 600, '', '', ''],
+            ['Реализация (акт) № ФР2 от 02.05.2026', '', '02.05.2026', '11.05.2026',
+             400, 400, 19, '', '', 400, '', '', ''],
+        ]
+        facts, lines, total = _parse_debt_new(rows, 'на 30.06.2026.xlsx')
+        self.assertEqual(len(facts), 1)
+        self.assertEqual(total, 1000)
+        self.assertEqual(facts[0]['client'], 'ООО Ромашка')
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[0]['doc_no'], 'ФР1')                    # номер извлекается
+        self.assertEqual(sum(l['debt_total'] for l in lines), 1000)    # строки = итог клиента
+
+    def test_unrecognized_file_returns_empty(self):
+        # чужой/битый файл → пустой разбор → load_debt его пропустит и НЕ обнулит данные
+        rows = [['что-то', 'другое'], [1, 2, 3]]
+        self.assertEqual(_parse_debt_new(rows, 'x')[0], [])
+        self.assertEqual(_parse_debt_old(rows)[0], [])
