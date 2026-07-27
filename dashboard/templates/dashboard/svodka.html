@@ -52,7 +52,7 @@
     </ul>
   </div>
   <div class="card">
-    <div class="ch"><span>Выполнение плана {{ cur_year }}</span><a class="link" href="{% url 'prodazhi' %}">все →</a></div>
+    <div class="ch"><span>Выполнение плана</span><a class="link" href="{% url 'prodazhi' %}">все →</a></div>
     {% if plans %}
     <ul class="rows">
       {% for p in plans %}<li><span class="nm">{{ p.manager }} · {{ p.month_name }}</span><span class="vl"><b class="{% if p.pct >= 100 %}up{% elif p.pct < 70 %}bad{% endif %}">{{ p.pct }}%</b> · {{ p.fact|intcomma }} / {{ p.plan|intcomma }}</span></li>{% endfor %}

@@ -190,12 +190,25 @@ def yoy(year, prev, **f):
     return {'now': sales_summary(year, **f2)['by_month'], 'prev': sales_summary(prev, **f2)['by_month']}
 
 
-def plan_status(year):
-    """План/факт продаж по менеджерам и месяцам (план ведётся в админке)."""
+def plan_status(year=None, manager=None, date_from=None, date_to=None):
+    """План/факт продаж по менеджерам и месяцам (план ведётся в админке).
+    Учитывает фильтры: период (показываем планы месяцев внутри диапазона) и менеджер."""
     from .models import SalesPlan
+    qs = SalesPlan.objects.all()
+    if manager:
+        qs = qs.filter(manager=manager)
+    if date_from and date_to:                       # только планы месяцев внутри периода
+        lo = date_from.year * 12 + date_from.month
+        hi = date_to.year * 12 + date_to.month
+        plans = [p for p in qs if lo <= p.year * 12 + p.month <= hi]
+    elif year:
+        plans = list(qs.filter(year=year))
+    else:
+        plans = list(qs)
+    plans.sort(key=lambda p: (p.year, p.month, p.manager))
     out = []
-    for p in SalesPlan.objects.filter(year=year).order_by('month', 'manager'):
-        q = SalesFact.objects.filter(year=year, month=p.month).exclude(client__in=_excluded())
+    for p in plans:
+        q = SalesFact.objects.filter(year=p.year, month=p.month).exclude(client__in=_excluded())
         if p.manager:
             q = q.filter(manager=p.manager)
         fact = q.aggregate(s=Sum('amount'))['s'] or 0

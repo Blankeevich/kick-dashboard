@@ -61,7 +61,8 @@ def svodka(request):
         'top_clients': metrics.top_clients(year, 5, **f),
         'managers': metrics.by_manager(year, **f),
         'debt': d, 'debtors': d['debtors'][:4],
-        'plans': metrics.plan_status(CUR_YEAR),
+        'plans': metrics.plan_status(year, manager=f['manager'],
+                                     date_from=f['date_from'], date_to=f['date_to']),
     })
     return render(request, 'dashboard/svodka.html', c)
 
@@ -80,7 +81,8 @@ def prodazhi(request):
         'all_clients': metrics.all_clients(year, **f),
         'managers': metrics.by_manager(year, **f),
         'top_sku': metrics.top_sku(CUR_YEAR, 8),
-        'plans': metrics.plan_status(CUR_YEAR),
+        'plans': metrics.plan_status(year, manager=f['manager'],
+                                     date_from=f['date_from'], date_to=f['date_to']),
     })
     return render(request, 'dashboard/prodazhi.html', c)
 

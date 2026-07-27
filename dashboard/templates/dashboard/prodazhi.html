@@ -24,7 +24,7 @@
     <ul class="rows">{% for m in managers %}<li><span class="nm">{{ m.manager }}</span><span class="vl">{{ m.amount|intcomma }} · <span class="q">{{ m.clients }} кл</span></span></li>{% endfor %}</ul>
   </div>
   <div class="card wide">
-    <div class="ch"><span>Выполнение плана {{ cur_year }}</span><small>план задаётся в админке</small></div>
+    <div class="ch"><span>Выполнение плана</span><small>план задаётся в админке</small></div>
     {% if plans %}
     <table>
       <thead><tr><th>Месяц</th><th>Менеджер</th><th>План</th><th>Факт</th><th>Выполнение</th></tr></thead>
