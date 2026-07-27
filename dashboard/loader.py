@@ -162,59 +162,44 @@ _DEBT_BUCKETS = [(7, 'До 7 дн'), (8, '8–15 дн'), (9, '16–30 дн'),
                  (10, '31–40 дн'), (11, '41–90 дн'), (12, '>90 дн')]
 
 
-def _load_debt_new(rows, up, filename):
+def _parse_debt_new(rows, filename):
     """Новый формат «по срокам долга»: строка клиента + под ней реализации.
     Колонки: 0 Менеджер/Документ · 1 Покупатель · 2 Отгрузка · 3 Срок оплаты ·
-    4 Долг · 5 Просрочено · 6 Дней · 7..12 корзины срока."""
+    4 Долг · 5 Просрочено · 6 Дней · 7..12 корзины срока. Возвращает СЛОВАРИ (без записи в БД)."""
     m = re.search(r'на (\d{2})\.(\d{2})\.(\d{4})', filename)
     snap = datetime(int(m.group(3)), int(m.group(2)), int(m.group(1))).date() if m else None
-    hdr = next(i for i, r in enumerate(rows) if len(r) > 1 and r[1] and str(r[1]).strip() == 'Покупатель')
+    hdr = next((i for i, r in enumerate(rows)
+                if len(r) > 1 and r[1] and str(r[1]).strip() == 'Покупатель'), None)
+    if hdr is None:
+        return [], [], 0
     facts, lines, total, cur = [], [], 0, None
     for r in rows[hdr + 2:]:
         a = str(r[0]).strip() if r[0] else ''
         b = str(r[1]).strip() if len(r) > 1 and r[1] else ''
         tot = _num(r[4])
-        if b and str(b) != 'Итого':          # строка клиента (Покупатель в колонке B)
-            cur, mgr = b, a
+        if b and b != 'Итого':                # строка клиента (Покупатель в колонке B)
+            cur = b
             if tot:
-                facts.append(DebtFact(upload=up, client=cur, manager=mgr, snapshot_date=snap,
-                                      ship_date=_date(r[2]), due_date=_date(r[3]),
-                                      debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
-                                      overdue_days=int(_num(r[6]) or 0)))
+                facts.append(dict(client=cur, manager=a, snapshot_date=snap,
+                                  ship_date=_date(r[2]), due_date=_date(r[3]),
+                                  debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
+                                  overdue_days=int(_num(r[6]) or 0)))
                 total += int(tot)
         elif a and not b and cur and tot and a != 'Итого':   # любой документ под клиентом
             bucket = next((nm for idx, nm in _DEBT_BUCKETS if len(r) > idx and _num(r[idx])), '')
             mno = re.search(r'№\s*(\S+)', a)
-            lines.append(DebtLine(upload=up, client=cur, doc_no=(mno.group(1) if mno else ''),
-                                  ship_date=_date(r[2]), due_date=_date(r[3]),
-                                  debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
-                                  overdue_days=int(_num(r[6]) or 0), bucket=bucket))
-    DebtFact.objects.bulk_create(facts, batch_size=1000)
-    DebtLine.objects.bulk_create(lines, batch_size=1000)
-    return len(facts), len(lines), total
+            lines.append(dict(client=cur, doc_no=(mno.group(1) if mno else ''),
+                              ship_date=_date(r[2]), due_date=_date(r[3]),
+                              debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
+                              overdue_days=int(_num(r[6]) or 0), bucket=bucket))
+    return facts, lines, total
 
 
-@transaction.atomic
-def load_debt(fileobj, filename, user=None):
-    h = _hash(fileobj)
-    if Upload.objects.filter(kind='debt', file_hash=h).exists():
-        return {'skipped': True, 'reason': 'Такой файл уже загружен'}
-    rows = _read_rows(fileobj, filename)
-    up = Upload.objects.create(kind='debt', filename=filename, file_hash=h, uploaded_by=user)
-    DebtFact.objects.all().delete()   # дебиторка — всегда актуальный снимок
-    DebtLine.objects.all().delete()
-    # новый формат: «Покупатель» стоит во 2-й колонке (есть расшифровка по реализациям)
-    is_new = any(len(r) > 1 and r[1] and str(r[1]).strip() == 'Покупатель' for r in rows[:6])
-    if is_new:
-        nf, nl, total = _load_debt_new(rows, up, filename)
-        up.rows_loaded, up.control_sum = nf, total
-        up.save()
-        return {'skipped': False, 'rows': nf, 'lines': nl, 'total': total}
-    # старый широкий формат: «Покупатель» в 1-й колонке
+def _parse_debt_old(rows):
+    """Старый широкий формат: «Покупатель» в 1-й колонке. Возвращает словари."""
     hdr = next((i for i, r in enumerate(rows) if r[0] and str(r[0]).strip() == 'Покупатель'), None)
     if hdr is None:
-        up.delete()
-        return {'skipped': True, 'reason': 'Не найдена шапка «Покупатель»'}
+        return [], [], 0
     facts, total = [], 0
     for r in rows[hdr + 1:]:
         client = r[0]
@@ -223,14 +208,38 @@ def load_debt(fileobj, filename, user=None):
         tot = _num(r[16])
         if tot is None:
             continue
-        facts.append(DebtFact(upload=up, client=str(client).strip(),
-                              manager=(str(r[5]).strip() if r[5] else ''),
-                              ship_date=_date(r[11]), due_date=_date(r[13]),
-                              debt_total=int(tot), debt_overdue=int(_num(r[18]) or 0),
-                              overdue_days=int(_num(r[21]) or 0)))
+        facts.append(dict(client=str(client).strip(),
+                          manager=(str(r[5]).strip() if r[5] else ''),
+                          ship_date=_date(r[11]), due_date=_date(r[13]),
+                          debt_total=int(tot), debt_overdue=int(_num(r[18]) or 0),
+                          overdue_days=int(_num(r[21]) or 0)))
         total += int(tot)
-    DebtFact.objects.bulk_create(facts, batch_size=1000)
+    return facts, [], total
+
+
+@transaction.atomic
+def load_debt(fileobj, filename, user=None):
+    h = _hash(fileobj)
+    if Upload.objects.filter(kind='debt', file_hash=h).exists():
+        return {'skipped': True, 'reason': 'Такой файл уже загружен'}
+    rows = _read_rows(fileobj, filename)
+    # строгое распознавание нового формата: в шапке «Менеджер…» в кол.A и «Покупатель» в кол.B
+    is_new = any(len(r) > 1 and r[1] and str(r[1]).strip() == 'Покупатель'
+                 and r[0] and 'енеджер' in str(r[0]) for r in rows[:8])
+    if is_new:
+        facts, lines, total = _parse_debt_new(rows, filename)
+    else:
+        facts, lines, total = _parse_debt_old(rows)
+    # ВАЖНО: не трогаем существующую дебиторку, пока разбор не дал непустой результат,
+    # иначе кривой/чужой файл обнулит данные
+    if not facts:
+        return {'skipped': True, 'reason': 'Формат не распознан или нет строк — данные не изменены'}
+    up = Upload.objects.create(kind='debt', filename=filename, file_hash=h, uploaded_by=user)
+    DebtFact.objects.all().delete()        # дебиторка — всегда актуальный снимок
+    DebtLine.objects.all().delete()
+    DebtFact.objects.bulk_create([DebtFact(upload=up, **d) for d in facts], batch_size=1000)
+    DebtLine.objects.bulk_create([DebtLine(upload=up, **d) for d in lines], batch_size=1000)
     up.rows_loaded = len(facts)
     up.control_sum = total
     up.save()
-    return {'skipped': False, 'rows': len(facts), 'total': total}
+    return {'skipped': False, 'rows': len(facts), 'lines': len(lines), 'total': total}
