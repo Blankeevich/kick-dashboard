@@ -225,11 +225,23 @@ def payment_calendar(year, month):
                 names = ', '.join(c for c, _ in top)
                 tip = (f"{d.strftime('%d.%m')} · {amount:,} ₽ · {info['count']} док · {names}"
                        .replace(',', ' '))
-            row.append({'day': d.day, 'amount': amount, 'short': _short_money(amount),
-                        'lvl': lvl, 'tip': tip, 'in_month': d.month == month, 'today': d == today})
+            row.append({'day': d.day, 'iso': d.strftime('%Y-%m-%d'), 'amount': amount,
+                        'short': _short_money(amount), 'lvl': lvl, 'tip': tip,
+                        'in_month': d.month == month, 'today': d == today})
         weeks.append(row)
     month_total = sum(by_date[d]['amount'] for d in month_days)
     return {'weeks': weeks, 'month_total': month_total, 'doc_count': sum(by_date[d]['count'] for d in month_days)}
+
+
+def payment_day(d):
+    """Кто должен оплатить в конкретный день и за какие отгрузки (документы с этим сроком оплаты)."""
+    from .models import DebtLine
+    rows = list(DebtLine.objects.filter(due_date=d).order_by('-debt_total')
+                .values('client', 'doc_no', 'ship_date', 'due_date',
+                        'debt_total', 'debt_overdue', 'overdue_days'))
+    for r in rows:
+        r['light'] = 'red' if r['overdue_days'] > 30 else 'amb' if r['overdue_days'] > 0 else 'green'
+    return rows
 
 
 def plan_status(year=None, manager=None, date_from=None, date_to=None):

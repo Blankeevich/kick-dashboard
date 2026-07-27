@@ -14,7 +14,7 @@
   </div>
   <div class="calgrid">
     {% for wd in weekdays %}<div class="wd">{{ wd }}</div>{% endfor %}
-    {% for week in cal.weeks %}{% for c in week %}<div class="cell{% if not c.in_month %} out{% endif %}{% if c.today %} today{% endif %}{% if c.in_month and c.lvl %} lvl{{ c.lvl }}{% endif %}"{% if c.tip %} data-tip="{{ c.tip }}"{% endif %}>
+    {% for week in cal.weeks %}{% for c in week %}<div class="cell{% if not c.in_month %} out{% endif %}{% if c.today %} today{% endif %}{% if c.in_month and c.lvl %} lvl{{ c.lvl }}{% endif %}{% if c.amount %} clk{% endif %}"{% if c.tip %} data-tip="{{ c.tip }}"{% endif %}{% if c.amount %} onclick="location.href='{% url 'oplaty_day' c.iso %}'"{% endif %}>
       <span class="dn">{{ c.day }}</span>
       {% if c.amount %}<span class="amt">{{ c.short }}</span><span class="cnt">{{ c.count }} док</span>{% endif %}
     </div>{% endfor %}{% endfor %}

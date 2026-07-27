@@ -9,6 +9,7 @@ urlpatterns = [
     path('prodazhi/', views.prodazhi, name='prodazhi'),
     path('debitorka/', views.debitorka, name='debitorka'),
     path('oplaty/', views.oplaty, name='oplaty'),
+    path('oplaty/day/<day>/', views.oplaty_day, name='oplaty_day'),
     path('upakovka/', views.upakovka, name='upakovka'),
     path('debitorka/<path:client>/', views.debtor, name='debtor'),
     path('upload/', views.upload, name='upload'),

@@ -172,6 +172,21 @@ def oplaty(request):
 
 
 @login_required
+def oplaty_day(request, day):
+    try:
+        d = datetime.strptime(day, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        d = date.today()
+    rows = metrics.payment_day(d)
+    return render(request, 'dashboard/oplaty_day.html', {
+        'page': 'oplaty', 'day': d, 'rows': rows,
+        'total': sum(r['debt_total'] for r in rows),
+        'overdue': sum(r['debt_overdue'] for r in rows),
+        'back_ym': f'{d.year}-{d.month:02d}',
+    })
+
+
+@login_required
 def upakovka(request):
     series = request.GET.get('series') or None
     used = request.GET.get('used') or None
