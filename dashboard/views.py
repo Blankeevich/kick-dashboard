@@ -164,6 +164,32 @@ def upload(request):
 
 
 @login_required
+def clients(request):
+    q = (request.GET.get('q') or '').strip().lower()
+    rows = metrics.clients_list(CUR_YEAR)
+    if q:
+        rows = [r for r in rows if q in r['name'].lower()]
+    return render(request, 'dashboard/clients.html', {
+        'page': 'clients', 'rows': rows, 'q': request.GET.get('q', ''),
+        'cur_year': CUR_YEAR, 'total_sales': sum(r['sales'] for r in rows),
+        'total_debt': sum(r['debt'] for r in rows)})
+
+
+@login_required
+def client_card(request, client):
+    p = metrics.client_profile(client, CUR_YEAR, PREV_YEAR)
+    ymax = max(max(p['now']), max(p['prev'])) or 1
+    bars = [{'m': MONTHS[i], 'now_h': round(p['now'][i] / ymax * 100),
+             'prev_h': round(p['prev'][i] / ymax * 100),
+             'now_v': p['now'][i], 'prev_v': p['prev'][i]} for i in range(12)]
+    hmax = max([h['debt_total'] for h in p['hist']], default=1) or 1
+    hist = [{'date': h['date'], 'total': h['debt_total'], 'h': round(h['debt_total'] / hmax * 100)} for h in p['hist']]
+    return render(request, 'dashboard/client_card.html', {
+        'page': 'clients', 'client_name': client, 'p': p, 'bars': bars, 'hist': hist,
+        'cur_year': CUR_YEAR, 'prev_year': PREV_YEAR})
+
+
+@login_required
 def oplaty(request):
     ym = request.GET.get('ym', '')
     try:

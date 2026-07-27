@@ -296,6 +296,46 @@ def plan_status(year=None, manager=None, date_from=None, date_to=None):
     return out
 
 
+def clients_list(year):
+    """Список клиентов с продажами за год, текущим долгом и каналом."""
+    excl = _excluded()
+    sales = {}
+    for r in SalesFact.objects.filter(year=year).exclude(client__in=excl).values('client').annotate(s=Sum('amount')):
+        sales[r['client']] = r['s'] or 0
+    debt = {}
+    for r in DebtFact.objects.exclude(client__in=excl).values('client').annotate(t=Sum('debt_total'), o=Sum('debt_overdue')):
+        debt[r['client']] = (r['t'] or 0, r['o'] or 0)
+    channels = dict(Client.objects.values_list('name', 'channel'))
+    names = set(sales) | set(debt)
+    rows = [{'name': n, 'sales': sales.get(n, 0),
+             'debt': debt.get(n, (0, 0))[0], 'overdue': debt.get(n, (0, 0))[1],
+             'channel': channels.get(n, '')} for n in names]
+    rows.sort(key=lambda r: -r['sales'])
+    return rows
+
+
+def client_profile(client, year, prev):
+    """Профиль клиента: продажи по месяцам (2 года), долг, расшифровка, история долга, справочные поля."""
+    from .models import DebtClientSnapshot
+    def months(yr):
+        by = [0] * 12
+        for r in (SalesFact.objects.filter(client=client, year=yr).values('month').annotate(s=Sum('amount'))):
+            by[r['month'] - 1] = r['s'] or 0
+        return by
+    now, was = months(year), months(prev)
+    d = debt_summary(client=client)
+    row = d['debtors'][0] if d['debtors'] else None
+    hist = list(DebtClientSnapshot.objects.filter(client=client).order_by('date')
+                .values('date', 'debt_total', 'debt_overdue'))
+    info = Client.objects.filter(name=client).first()
+    return {'now': now, 'prev': was, 'sales_total': sum(now), 'prev_total': sum(was),
+            'debt': d, 'row': row, 'lines': debt_lines(client), 'hist': hist,
+            'channel': info.get_channel_display() if info else '—',
+            'credit_limit': info.credit_limit if info else None,
+            'note': info.note if info else '',
+            'over_limit': bool(info and info.credit_limit and row and row['debt_total'] > info.credit_limit)}
+
+
 def filter_options(year):
     managers = sorted(set(SalesFact.objects.exclude(client__in=_excluded())
                           .exclude(manager='').values_list('manager', flat=True)))

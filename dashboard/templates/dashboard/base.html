@@ -121,12 +121,12 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
       <a class="ni {% if page == 'debitorka' %}on{% endif %}" href="{% url 'debitorka' %}">◆ Дебиторка</a>
       <a class="ni {% if page == 'oplaty' %}on{% endif %}" href="{% url 'oplaty' %}">▦ График оплат</a>
       <a class="ni {% if page == 'upakovka' %}on{% endif %}" href="{% url 'upakovka' %}">▣ Упаковка</a>
+      <a class="ni {% if page == 'clients' %}on{% endif %}" href="{% url 'clients' %}">☺ Клиенты</a>
       <div class="ng">Управление</div>
       <a class="ni {% if page == 'upload' %}on{% endif %}" href="{% url 'upload' %}">⤴ Загрузить данные</a>
       <a class="ni" href="/admin/">⚙ Админка</a>
       <div class="ng">Скоро</div>
       <span class="ni soon">○ Деньги</span>
-      <span class="ni soon">○ Клиенты</span>
     </nav>
     <div class="usr">{{ request.user.username }}<br><a href="{% url 'logout' %}">Выйти</a></div>
   </aside>

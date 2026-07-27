@@ -1,0 +1,52 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}{{ client_name }}{% endblock %}
+{% block content %}
+<div style="margin-bottom:12px"><a href="{% url 'clients' %}" class="link">← все клиенты</a></div>
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">{{ client_name }}</div><div class="kv sm" style="font-size:20px">{{ p.sales_total|intcomma }} <span class="cur">₽</span></div><div class="kf">продажи {{ cur_year }} · канал: {{ p.channel }}</div></div>
+  <div class="kpi"><div class="kl">Текущий долг</div><div class="kv sm">{{ p.debt.total|intcomma }} <span class="cur">₽</span></div><div class="kf {% if p.row.debt_overdue %}bad{% endif %}">{% if p.row.debt_overdue %}просрочено {{ p.row.debt_overdue|intcomma }}{% else %}в сроке{% endif %}</div></div>
+  <div class="kpi"><div class="kl">Кредитный лимит</div><div class="kv sm">{% if p.credit_limit %}{{ p.credit_limit|intcomma }}{% else %}—{% endif %}</div><div class="kf">{% if p.over_limit %}<b class="bad">лимит превышен</b>{% else %}в рамках{% endif %}</div></div>
+  <div class="kpi"><div class="kl">Продажи {{ prev_year }}</div><div class="kv sm">{{ p.prev_total|intcomma }} <span class="cur">₽</span></div><div class="kf">для сравнения</div></div>
+</section>
+
+<section class="grid">
+  <div class="card wide">
+    <div class="ch"><span>Продажи по месяцам</span><small>{{ cur_year }} к {{ prev_year }}</small></div>
+    <div class="chart">
+      {% for b in bars %}<div class="col"><div class="bars">
+        <i class="prev" style="height:{{ b.prev_h }}%" data-tip="{{ b.m }} {{ prev_year }}: {{ b.prev_v|intcomma }} ₽"></i>
+        <i class="now" style="height:{{ b.now_h }}%" data-tip="{{ b.m }} {{ cur_year }}: {{ b.now_v|intcomma }} ₽"></i>
+      </div><span>{{ b.m }}</span></div>{% endfor %}
+    </div>
+  </div>
+  {% if hist|length > 1 %}
+  <div class="card wide">
+    <div class="ch"><span>Динамика долга</span><small>по снимкам дебиторки</small></div>
+    <div class="day-chart">
+      {% for h in hist %}<div class="dc" data-tip="{{ h.date|date:'d.m.Y' }}: {{ h.total|intcomma }} ₽"><i style="height:{{ h.h }}%"></i><span>{{ h.date|date:'d.m' }}</span></div>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<div class="card wide">
+  <div class="ch"><span>Из чего складывается долг</span><small>реализации по срокам оплаты</small></div>
+  {% if p.lines %}
+  <table>
+    <thead><tr><th></th><th>Документ</th><th>Отгрузка</th><th>Срок оплаты</th><th>Долг</th><th>Просрочено</th></tr></thead>
+    <tbody>
+      {% for l in p.lines %}<tr {% if l.light == 'red' %}class="bad"{% endif %}>
+        <td><span class="dot {{ l.light }}"></span></td>
+        <td style="font-variant-numeric:tabular-nums">{{ l.doc_no|default:"—" }}</td>
+        <td>{{ l.ship_date|date:"d.m.Y"|default:"—" }}</td>
+        <td>{{ l.due_date|date:"d.m.Y"|default:"—" }}</td>
+        <td>{{ l.debt_total|intcomma }} ₽</td>
+        <td>{% if l.debt_overdue %}<b class="bad">{{ l.debt_overdue|intcomma }} ₽</b>{% else %}—{% endif %}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="foot">Долга по этому клиенту нет.</div>{% endif %}
+  {% if p.note %}<div class="foot"><b>Заметка:</b> {{ p.note }}</div>{% endif %}
+  <div class="foot">Канал, лимит и заметку по клиенту можно редактировать в админке → «Справочник клиентов».</div>
+</div>
+{% endblock %}
