@@ -119,6 +119,7 @@ class DebtClientSnapshot(models.Model):
 class DebtLine(models.Model):
     """Отдельная реализация в составе долга клиента (расшифровка по срокам из 1С)."""
     upload = models.ForeignKey(Upload, on_delete=models.CASCADE)
+    snapshot_date = models.DateField('Дата снимка', null=True, db_index=True)
     client = models.CharField('Контрагент', max_length=255, db_index=True)
     doc_no = models.CharField('Номер документа', max_length=60, blank=True)
     ship_date = models.DateField('Дата отгрузки', null=True, blank=True)

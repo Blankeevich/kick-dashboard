@@ -248,16 +248,20 @@ def load_debt(fileobj, filename, user=None):
     # иначе кривой/чужой файл обнулит данные
     if not facts:
         return {'skipped': True, 'reason': 'Формат не распознан или нет строк — данные не изменены'}
-    up = Upload.objects.create(kind='debt', filename=filename, file_hash=h, uploaded_by=user)
-    DebtFact.objects.all().delete()        # дебиторка — всегда актуальный снимок
-    DebtLine.objects.all().delete()
-    DebtFact.objects.bulk_create([DebtFact(upload=up, **d) for d in facts], batch_size=1000)
-    DebtLine.objects.bulk_create([DebtLine(upload=up, **d) for d in lines], batch_size=1000)
+    snap_date = facts[0].get('snapshot_date') or datetime.now().date()
+    up = Upload.objects.create(kind='debt', filename=filename, file_hash=h, uploaded_by=user,
+                               note=f'снимок {snap_date}')
+    # СНИМОК ПО ДАТЕ: заменяем только этот же день, прошлые снимки храним
+    DebtFact.objects.filter(snapshot_date=snap_date).delete()
+    DebtLine.objects.filter(snapshot_date=snap_date).delete()
+    DebtFact.objects.bulk_create(
+        [DebtFact(upload=up, **{**d, 'snapshot_date': snap_date}) for d in facts], batch_size=1000)
+    DebtLine.objects.bulk_create(
+        [DebtLine(upload=up, snapshot_date=snap_date, **d) for d in lines], batch_size=1000)
     up.rows_loaded = len(facts)
     up.control_sum = total
     up.save()
-    # история долга (снимок на дату): для динамики «кто растёт / кто гасит»
-    snap_date = facts[0].get('snapshot_date') or datetime.now().date()
+    # сводка снимка для истории/динамики
     overdue = sum(f['debt_overdue'] for f in facts)
     DebtSnapshot.objects.update_or_create(
         date=snap_date, defaults={'total': total, 'overdue': overdue, 'count': len(facts)})
@@ -266,7 +270,14 @@ def load_debt(fileobj, filename, user=None):
         [DebtClientSnapshot(date=snap_date, client=f['client'],
                             debt_total=f['debt_total'], debt_overdue=f['debt_overdue']) for f in facts],
         batch_size=1000)
-    return {'skipped': False, 'rows': len(facts), 'lines': len(lines), 'total': total}
+    # ретеншен: храним последние 120 снимков
+    old = list(DebtSnapshot.objects.order_by('-date').values_list('date', flat=True)[120:])
+    if old:
+        DebtFact.objects.filter(snapshot_date__in=old).delete()
+        DebtLine.objects.filter(snapshot_date__in=old).delete()
+        DebtSnapshot.objects.filter(date__in=old).delete()
+        DebtClientSnapshot.objects.filter(date__in=old).delete()
+    return {'skipped': False, 'rows': len(facts), 'lines': len(lines), 'total': total, 'snap': str(snap_date)}
 
 
 # ---------- Снимок упаковки (обновление остатков с сайта) ----------

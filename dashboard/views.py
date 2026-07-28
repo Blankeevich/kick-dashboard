@@ -109,9 +109,13 @@ def debitorka(request):
     f = c['f']
     only_overdue = request.GET.get('overdue') == '1'
     order = request.GET.get('order', '-debt_total')
+    snap_dates = metrics.debt_dates()
+    sel_snap = _pdate(request.GET.get('snap'))
+    if sel_snap not in snap_dates:
+        sel_snap = snap_dates[0] if snap_dates else None
     d = metrics.debt_summary(manager=f['manager'], client=f['client'],
-                             only_overdue=only_overdue, order=order)
-    aging = metrics.debt_aging(manager=f['manager'], client=f['client'])
+                             only_overdue=only_overdue, order=order, snapshot=sel_snap)
+    aging = metrics.debt_aging(manager=f['manager'], client=f['client'], snapshot=sel_snap)
     bmax = max([b['amount'] for b in aging['buckets']], default=1) or 1
     for b in aging['buckets']:
         b['h'] = round(b['amount'] / bmax * 100)
@@ -120,7 +124,8 @@ def debitorka(request):
     hist_bars = [{'date': h['date'], 'total': h['total'], 'overdue': h['overdue'],
                   'h': round(h['total'] / hmax * 100)} for h in hist]
     c.update({'debt': d, 'debtors': d['debtors'], 'aging': aging,
-              'hist_bars': hist_bars, 'only_overdue': only_overdue, 'order': order})
+              'hist_bars': hist_bars, 'only_overdue': only_overdue, 'order': order,
+              'snap_dates': snap_dates, 'sel_snap': sel_snap, 'is_latest': sel_snap == (snap_dates[0] if snap_dates else None)})
     return render(request, 'dashboard/debitorka.html', c)
 
 

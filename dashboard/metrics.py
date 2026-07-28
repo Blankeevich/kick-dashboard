@@ -104,8 +104,22 @@ def top_sku(year=None, limit=8):
     return out
 
 
-def debt_summary(manager=None, client=None, only_overdue=False, min_amount=1000, order='-debt_total'):
-    qs = DebtFact.objects.exclude(client__in=_excluded()).filter(debt_total__gte=min_amount)
+def _latest_debt_date():
+    from django.db.models import Max
+    return DebtFact.objects.aggregate(d=Max('snapshot_date'))['d']
+
+
+def debt_dates():
+    """Все даты снимков дебиторки (новые сверху) — для селектора."""
+    from .models import DebtSnapshot
+    return list(DebtSnapshot.objects.order_by('-date').values_list('date', flat=True))
+
+
+def debt_summary(manager=None, client=None, only_overdue=False, min_amount=1000,
+                 order='-debt_total', snapshot=None):
+    snap = snapshot or _latest_debt_date()
+    qs = (DebtFact.objects.filter(snapshot_date=snap)
+          .exclude(client__in=_excluded()).filter(debt_total__gte=min_amount))
     if manager:
         qs = qs.filter(manager=manager)
     if client:
@@ -121,7 +135,7 @@ def debt_summary(manager=None, client=None, only_overdue=False, min_amount=1000,
         'client', 'manager', 'debt_total', 'debt_overdue', 'overdue_days', 'due_date'))
     limits = dict(Client.objects.exclude(credit_limit__isnull=True)
                   .values_list('name', 'credit_limit'))
-    deltas, _prev = debt_client_deltas()
+    deltas, _prev = debt_client_deltas(snap)
     for d in debtors:                       # кредитный лимит, флаг превышения, динамика
         lim = limits.get(d['client'])
         d['credit_limit'] = lim
@@ -134,10 +148,11 @@ def debt_summary(manager=None, client=None, only_overdue=False, min_amount=1000,
             'count': qs.count(), 'debtors': debtors}
 
 
-def debt_lines(client):
+def debt_lines(client, snapshot=None):
     """Реализации, формирующие долг клиента (расшифровка из 1С). Просроченные — сверху."""
     from .models import DebtLine
-    rows = list(DebtLine.objects.filter(client=client)
+    snap = snapshot or _latest_debt_date()
+    rows = list(DebtLine.objects.filter(client=client, snapshot_date=snap)
                 .order_by('-debt_overdue', 'due_date', '-debt_total')
                 .values('doc_no', 'ship_date', 'due_date', 'debt_total',
                         'debt_overdue', 'overdue_days', 'bucket'))
@@ -151,18 +166,19 @@ def _debt_ref_date():
     return DebtFact.objects.aggregate(d=Max('snapshot_date'))['d'] or date.today()
 
 
-def debt_aging(manager=None, client=None):
+def debt_aging(manager=None, client=None, snapshot=None):
     """Кошельки (просрочено / к оплате на неделе / в сроке) и корзины срока долга."""
     from datetime import timedelta
     from .models import DebtLine
-    ref = _debt_ref_date()
-    scope = DebtFact.objects.exclude(client__in=_excluded())
+    snap = snapshot or _latest_debt_date()
+    ref = snap or date.today()
+    scope = DebtFact.objects.filter(snapshot_date=snap).exclude(client__in=_excluded())
     if manager:
         scope = scope.filter(manager=manager)
     if client:
         scope = scope.filter(client=client)
     names = set(scope.values_list('client', flat=True))
-    lines = DebtLine.objects.filter(client__in=names)
+    lines = DebtLine.objects.filter(client__in=names, snapshot_date=snap)
     overdue = week = future = 0
     buckets = {nm: 0 for nm in ['До 7 дн', '8–15 дн', '16–30 дн', '31–40 дн', '41–90 дн', '>90 дн']}
     horizon = ref + timedelta(days=7)
@@ -187,16 +203,20 @@ def debt_history(limit=12):
     return rows[-limit:]
 
 
-def debt_client_deltas():
-    """Изменение долга по клиентам между двумя последними снимками: >0 растёт, <0 гасит."""
+def debt_client_deltas(snapshot=None):
+    """Изменение долга по клиентам: выбранный снимок минус предыдущий. >0 растёт, <0 гасит."""
     from .models import DebtSnapshot, DebtClientSnapshot
-    dates = list(DebtSnapshot.objects.order_by('-date').values_list('date', flat=True)[:2])
+    dates = list(DebtSnapshot.objects.order_by('-date').values_list('date', flat=True))
     if len(dates) < 2:
         return {}, None
-    cur = dict(DebtClientSnapshot.objects.filter(date=dates[0]).values_list('client', 'debt_total'))
-    prev = dict(DebtClientSnapshot.objects.filter(date=dates[1]).values_list('client', 'debt_total'))
+    i = dates.index(snapshot) if snapshot in dates else 0
+    if i + 1 >= len(dates):
+        return {}, None
+    cur_d, prev_d = dates[i], dates[i + 1]
+    cur = dict(DebtClientSnapshot.objects.filter(date=cur_d).values_list('client', 'debt_total'))
+    prev = dict(DebtClientSnapshot.objects.filter(date=prev_d).values_list('client', 'debt_total'))
     deltas = {c: cur[c] - prev.get(c, 0) for c in cur}
-    return deltas, dates[1]
+    return deltas, prev_d
 
 
 def client_sales(client, limit=100):
@@ -227,7 +247,8 @@ def payment_calendar(year, month):
     from collections import defaultdict
     from .models import DebtLine
     by_date = defaultdict(lambda: {'amount': 0, 'count': 0, 'clients': defaultdict(int)})
-    for r in DebtLine.objects.filter(due_date__isnull=False).values('due_date', 'client', 'debt_total'):
+    snap = _latest_debt_date()
+    for r in DebtLine.objects.filter(snapshot_date=snap, due_date__isnull=False).values('due_date', 'client', 'debt_total'):
         c = by_date[r['due_date']]
         c['amount'] += r['debt_total']
         c['count'] += 1
@@ -259,7 +280,8 @@ def payment_calendar(year, month):
 def payment_day(d):
     """Кто должен оплатить в конкретный день и за какие отгрузки (документы с этим сроком оплаты)."""
     from .models import DebtLine
-    rows = list(DebtLine.objects.filter(due_date=d).order_by('-debt_total')
+    snap = _latest_debt_date()
+    rows = list(DebtLine.objects.filter(snapshot_date=snap, due_date=d).order_by('-debt_total')
                 .values('client', 'doc_no', 'ship_date', 'due_date',
                         'debt_total', 'debt_overdue', 'overdue_days'))
     for r in rows:
