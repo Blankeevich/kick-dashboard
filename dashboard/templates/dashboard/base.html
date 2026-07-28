@@ -133,6 +133,7 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
       <a class="ni {% if page == 'oplaty' %}on{% endif %}" href="{% url 'oplaty' %}">▦ График оплат</a>
       <a class="ni {% if page == 'upakovka' %}on{% endif %}" href="{% url 'upakovka' %}">▣ Упаковка</a>
       <a class="ni {% if page == 'clients' %}on{% endif %}" href="{% url 'clients' %}">☺ Клиенты</a>
+      <a class="ni {% if page == 'rfm' %}on{% endif %}" href="{% url 'rfm' %}">◑ Сегменты</a>
       <div class="ng">Управление</div>
       {% if user.is_staff %}
       <a class="ni {% if page == 'upload' %}on{% endif %}" href="{% url 'upload' %}">⤴ Загрузить данные</a>

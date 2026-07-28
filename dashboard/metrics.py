@@ -308,6 +308,67 @@ def forgotten_clients(current_year):
     return rows
 
 
+def rfm():
+    """RFM-сегментация + ABC клиентов на основе продаж (без новых данных)."""
+    from datetime import date as _d
+    from django.db.models import Max, Count
+    today = _d.today()
+    excl = _excluded()
+    data = []
+    for r in (SalesFact.objects.exclude(client__in=excl).filter(amount__gt=0, doc_date__isnull=False)
+              .values('client').annotate(last=Max('doc_date'), m=Sum('amount'),
+                                         f=Count('doc_date', distinct=True))):
+        data.append({'client': r['client'], 'r_days': (today - r['last']).days,
+                     'last': r['last'], 'm': r['m'] or 0, 'f': r['f']})
+    if not data:
+        return {'segments': [], 'rows': [], 'total_clients': 0}
+
+    def q(vals, frac):
+        s = sorted(vals)
+        return s[min(int(len(s) * frac), len(s) - 1)]
+    rt1, rt2 = q([d['r_days'] for d in data], .33), q([d['r_days'] for d in data], .66)
+    ft1, ft2 = q([d['f'] for d in data], .33), q([d['f'] for d in data], .66)
+    mt1, mt2 = q([d['m'] for d in data], .33), q([d['m'] for d in data], .66)
+
+    def sc(v, t1, t2):
+        return 1 if v <= t1 else 2 if v <= t2 else 3
+
+    def seg(R, F, M):
+        if R >= 3 and F >= 2 and M >= 2:
+            return 'Чемпионы'
+        if M >= 3 and R <= 1:
+            return 'Крупные под угрозой'
+        if R >= 3 and F <= 1:
+            return 'Новички'
+        if F >= 2 and M >= 2:
+            return 'Лояльные'
+        if R <= 1:
+            return 'Спящие'
+        return 'Обычные'
+
+    for d in data:
+        d['R'] = 3 if d['r_days'] <= rt1 else 2 if d['r_days'] <= rt2 else 1
+        d['F'] = sc(d['f'], ft1, ft2)
+        d['M'] = sc(d['m'], mt1, mt2)
+        d['seg'] = seg(d['R'], d['F'], d['M'])
+    # ABC по накопленной доле выручки
+    data.sort(key=lambda x: -x['m'])
+    tot = sum(d['m'] for d in data) or 1
+    cum = 0
+    for d in data:
+        cum += d['m']
+        share = cum / tot * 100
+        d['abc'] = 'A' if share <= 80 else 'B' if share <= 95 else 'C'
+    # сводка по сегментам
+    order = ['Чемпионы', 'Лояльные', 'Новички', 'Крупные под угрозой', 'Спящие', 'Обычные']
+    summ = {s: {'seg': s, 'count': 0, 'revenue': 0} for s in order}
+    for d in data:
+        summ[d['seg']]['count'] += 1
+        summ[d['seg']]['revenue'] += d['m']
+    return {'segments': [summ[s] for s in order if summ[s]['count']],
+            'rows': data, 'total_clients': len(data)}
+
+
 def signals():
     """Сигналы «что требует внимания»: замолчавшие клиенты, рост долга, превышение лимита, падение SKU."""
     from datetime import timedelta

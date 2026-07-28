@@ -190,6 +190,23 @@ def upload(request):
 
 
 @login_required
+def rfm(request):
+    data = metrics.rfm()
+    seg = request.GET.get('seg') or ''
+    abc = request.GET.get('abc') or ''
+    rows = data['rows']
+    if seg:
+        rows = [r for r in rows if r['seg'] == seg]
+    if abc:
+        rows = [r for r in rows if r['abc'] == abc]
+    rows = sorted(rows, key=lambda r: -r['m'])[:400]
+    return render(request, 'dashboard/rfm.html', {
+        'page': 'rfm', 'segments': data['segments'], 'rows': rows,
+        'total_clients': data['total_clients'], 'sel_seg': seg, 'sel_abc': abc,
+        'shown': len(rows)})
+
+
+@login_required
 def signals(request):
     return render(request, 'dashboard/signals.html',
                   {'page': 'signals', 's': metrics.signals(), 'cur_year': CUR_YEAR})

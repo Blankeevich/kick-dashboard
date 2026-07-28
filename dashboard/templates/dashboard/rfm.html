@@ -1,0 +1,45 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Сегменты{% endblock %}
+{% block content %}
+<h2 style="margin:0 0 4px;font-size:22px">Сегменты клиентов</h2>
+<div class="foot" style="margin:0 0 14px">RFM: как давно покупал · как часто · на сколько. Плюс ABC по вкладу в выручку. Всё из продаж.</div>
+
+<section class="grid">
+  {% for s in segments %}
+  <a class="card" href="{% url 'rfm' %}?seg={{ s.seg|urlencode }}" style="text-decoration:none;color:inherit;{% if sel_seg == s.seg %}border:1px solid var(--pu){% endif %}">
+    <div class="kl">{{ s.seg }}</div>
+    <div class="kv sm" style="font-size:22px">{{ s.count }}</div>
+    <div class="kf">{{ s.revenue|intcomma }} ₽</div>
+  </a>
+  {% endfor %}
+</section>
+
+<div class="card wide" style="margin-top:14px">
+  <div class="ch">
+    <span>{% if sel_seg %}{{ sel_seg }}{% else %}Все клиенты{% endif %}{% if sel_abc %} · ABC: {{ sel_abc }}{% endif %} — {{ shown }}</span>
+    <span style="font-size:11px;font-weight:400;color:var(--ink2)">
+      ABC:
+      <a href="?{% if sel_seg %}seg={{ sel_seg|urlencode }}{% endif %}" class="perbtn {% if not sel_abc %}on{% endif %}">все</a>
+      <a href="?abc=A{% if sel_seg %}&seg={{ sel_seg|urlencode }}{% endif %}" class="perbtn {% if sel_abc == 'A' %}on{% endif %}">A</a>
+      <a href="?abc=B{% if sel_seg %}&seg={{ sel_seg|urlencode }}{% endif %}" class="perbtn {% if sel_abc == 'B' %}on{% endif %}">B</a>
+      <a href="?abc=C{% if sel_seg %}&seg={{ sel_seg|urlencode }}{% endif %}" class="perbtn {% if sel_abc == 'C' %}on{% endif %}">C</a>
+      {% if sel_seg or sel_abc %}· <a href="{% url 'rfm' %}" class="link">сбросить</a>{% endif %}
+    </span>
+  </div>
+  <table>
+    <thead><tr><th>Клиент</th><th>Сегмент</th><th>ABC</th><th>Последний заказ</th><th>Дней</th><th>Заказов</th><th>Выручка</th></tr></thead>
+    <tbody>
+      {% for r in rows %}<tr onclick="location.href='{% url 'client_card' r.client %}'" style="cursor:pointer">
+        <td>{{ r.client }}</td>
+        <td><span class="pill">{{ r.seg }}</span></td>
+        <td><b>{{ r.abc }}</b></td>
+        <td>{{ r.last|date:"d.m.Y" }}</td>
+        <td>{% if r.r_days > 180 %}<span class="bad">{{ r.r_days }}</span>{% else %}{{ r.r_days }}{% endif %}</td>
+        <td>{{ r.f }}</td>
+        <td>{{ r.m|intcomma }} ₽</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="foot">Клик по клиенту — карточка. «Крупные под угрозой» и «Спящие» — кого будить в первую очередь.</div>
+</div>
+{% endblock %}
