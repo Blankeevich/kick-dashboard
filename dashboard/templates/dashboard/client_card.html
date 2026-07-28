@@ -67,7 +67,11 @@
       </ul>
     </div>
     <div class="card" style="margin:0">
-      <div class="ch"><span>Продажи по месяцам</span><small>{{ cur_year }} к {{ prev_year }}</small></div>
+      <div class="ch"><span>Продажи по месяцам</span>
+        <form method="get" style="margin:0"><select name="y" onchange="this.form.submit()" style="font-size:12px;border:1px solid var(--line);border-radius:8px;padding:4px 8px">
+          {% for yr in sales_years %}<option value="{{ yr }}" {% if yr == sel_y %}selected{% endif %}>{{ yr }} к {{ yr|add:"-1" }}</option>{% endfor %}
+        </select></form>
+      </div>
       <div class="chart">
         {% for b in bars %}<div class="col"><div class="bars">
           <i class="prev" style="height:{{ b.prev_h }}%" data-tip="{{ b.m }} {{ prev_year }}: {{ b.prev_v|intcomma }} ₽"></i>

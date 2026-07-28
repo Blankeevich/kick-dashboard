@@ -60,7 +60,14 @@ def svodka(request):
     f = c['f']
     year = None if c['has_period'] else CUR_YEAR
     s = metrics.sales_summary(year, **f)
-    y = metrics.yoy(CUR_YEAR, PREV_YEAR, **{k: f[k] for k in ('manager', 'channel', 'client')})
+    years = metrics.sales_years()
+    try:
+        chart_y = int(request.GET.get('y'))
+    except (TypeError, ValueError):
+        chart_y = None
+    if chart_y not in years:
+        chart_y = CUR_YEAR if CUR_YEAR in years or not years else years[0]
+    y = metrics.yoy(chart_y, chart_y - 1, **{k: f[k] for k in ('manager', 'channel', 'client')})
     ymax = max(max(y['now']), max(y['prev'])) or 1
     now7, prev7 = sum(y['now'][:7]), sum(y['prev'][:7]) or 1
     day = metrics.sales_by_day(year, **f)
@@ -72,6 +79,7 @@ def svodka(request):
                       'prev_h': round(y['prev'][i] / ymax * 100),
                       'now_v': y['now'][i], 'prev_v': y['prev'][i]} for i in range(12)],
         'yoy_delta': round((now7 - prev7) / prev7 * 100),
+        'chart_y': chart_y, 'chart_prev': chart_y - 1, 'sales_years': years,
         'day': day, 'day_bars': [{'d': x['day'], 'h': round(x['amount'] / dmax * 100),
                                   'amount': x['amount']} for x in day['days']],
         'top_clients': metrics.top_clients(year, 5, **f),
@@ -198,7 +206,14 @@ def clients(request):
 @login_required
 def client_card(request, client):
     from .models import Client, ManagerProfile
-    p = metrics.client_profile(client, CUR_YEAR, PREV_YEAR)
+    years = metrics.sales_years()
+    try:
+        sel_y = int(request.GET.get('y'))
+    except (TypeError, ValueError):
+        sel_y = None
+    if sel_y not in years:
+        sel_y = years[0] if years else CUR_YEAR
+    p = metrics.client_profile(client, sel_y, sel_y - 1)
     prof = ManagerProfile.objects.filter(user=request.user).first()
     can_edit = bool(request.user.is_staff or (prof and prof.manager and prof.manager == p['owner_manager']))
     saved = False
@@ -225,7 +240,7 @@ def client_card(request, client):
     hist = [{'date': h['date'], 'total': h['debt_total'], 'h': round(h['debt_total'] / hmax * 100)} for h in p['hist']]
     return render(request, 'dashboard/client_card.html', {
         'page': 'clients', 'client_name': client, 'p': p, 'bars': bars, 'hist': hist,
-        'cur_year': CUR_YEAR, 'prev_year': PREV_YEAR,
+        'cur_year': sel_y, 'prev_year': sel_y - 1, 'sales_years': years, 'sel_y': sel_y,
         'can_edit': can_edit, 'saved': saved, 'channels': Client.CHANNELS, 'statuses': Client.STATUS,
         'last_sales': last_sales, 'last_debt': last_debt})
 

@@ -228,6 +228,11 @@ def client_sales(client, limit=100):
     return list(qs)
 
 
+def sales_years():
+    """Годы, за которые есть продажи (новые сверху) — для селектора года на графиках."""
+    return sorted(set(SalesFact.objects.values_list('year', flat=True)), reverse=True)
+
+
 def yoy(year, prev, **f):
     f2 = {k: v for k, v in f.items() if k not in ('date_from', 'date_to')}
     return {'now': sales_summary(year, **f2)['by_month'], 'prev': sales_summary(prev, **f2)['by_month']}

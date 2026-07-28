@@ -21,14 +21,23 @@
 
 <section class="grid">
   <div class="card">
-    <div class="ch"><span>Продажи: {{ cur_year }} к {{ prev_year }}</span></div>
+    <div class="ch"><span>Продажи год к году</span>
+      <form method="get" style="margin:0">
+        {% if sel_manager %}<input type="hidden" name="manager" value="{{ sel_manager }}">{% endif %}
+        {% if sel_channel %}<input type="hidden" name="channel" value="{{ sel_channel }}">{% endif %}
+        {% if sel_client %}<input type="hidden" name="client" value="{{ sel_client }}">{% endif %}
+        <select name="y" onchange="this.form.submit()" style="font-size:12px;border:1px solid var(--line);border-radius:8px;padding:4px 8px">
+          {% for yr in sales_years %}<option value="{{ yr }}" {% if yr == chart_y %}selected{% endif %}>{{ yr }} к {{ yr|add:"-1" }}</option>{% endfor %}
+        </select>
+      </form>
+    </div>
     <div class="chart">
       {% for b in yoy_bars %}<div class="col"><div class="bars">
-        <i class="prev" style="height:{{ b.prev_h }}%" data-tip="{{ b.m }} {{ prev_year }}: {{ b.prev_v|intcomma }} ₽"></i>
-        <i class="now" style="height:{{ b.now_h }}%" data-tip="{{ b.m }} {{ cur_year }}: {{ b.now_v|intcomma }} ₽"></i>
+        <i class="prev" style="height:{{ b.prev_h }}%" data-tip="{{ b.m }} {{ chart_prev }}: {{ b.prev_v|intcomma }} ₽"></i>
+        <i class="now" style="height:{{ b.now_h }}%" data-tip="{{ b.m }} {{ chart_y }}: {{ b.now_v|intcomma }} ₽"></i>
       </div><span>{{ b.m }}</span></div>{% endfor %}
     </div>
-    <div class="foot"><b class="bad">{{ yoy_delta }}%</b> год к году за 7 месяцев</div>
+    <div class="foot"><b class="bad">{{ yoy_delta }}%</b> {{ chart_y }} к {{ chart_prev }} за 7 месяцев</div>
   </div>
   <div class="card">
     <div class="ch"><span>Топ клиентов</span><a class="link" href="{% url 'prodazhi' %}?{{ request.GET.urlencode }}">все →</a></div>
