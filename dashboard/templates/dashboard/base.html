@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KICK — {{ page }}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 *{box-sizing:border-box}
@@ -17,6 +18,8 @@ body{margin:0;background:#f5f5f7;font:100%/1.5 'Inter',system-ui,-apple-system,"
 .nav{display:flex;flex-direction:column;gap:2px}
 .ng{font-size:11px;letter-spacing:.02em;color:var(--ink2);margin:12px 8px 4px}
 .ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;font-size:13.5px;color:var(--ink);text-decoration:none}
+.ni i{font-size:18px;color:var(--ink2);width:20px;text-align:center}
+.ni.on i{color:var(--pu)}
 .ni:hover{background:var(--sf2)}
 .ni.on{background:var(--pu2);color:var(--pu);font-weight:600}
 .ni.soon{color:var(--ink2);cursor:default}
@@ -135,25 +138,25 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
     <div class="brand"><div class="logo">K</div><div><div class="bn">KICK</div><div class="bs">Панель управления</div></div></div>
     <nav class="nav">
       <div class="ng">Обзор</div>
-      <a class="ni {% if page == 'svodka' %}on{% endif %}" href="{% url 'svodka' %}">◧ Сводка</a>
-      <a class="ni {% if page == 'prodazhi' %}on{% endif %}" href="{% url 'prodazhi' %}">◈ Продажи</a>
-      <a class="ni {% if page == 'debitorka' %}on{% endif %}" href="{% url 'debitorka' %}">◆ Дебиторка</a>
-      <a class="ni {% if page == 'oplaty' %}on{% endif %}" href="{% url 'oplaty' %}">▦ График оплат</a>
-      <a class="ni {% if page == 'upakovka' %}on{% endif %}" href="{% url 'upakovka' %}">▣ Упаковка</a>
-      <a class="ni {% if page == 'clients' %}on{% endif %}" href="{% url 'clients' %}">☺ Клиенты</a>
+      <a class="ni {% if page == 'svodka' %}on{% endif %}" href="{% url 'svodka' %}"><i class="ti ti-layout-dashboard"></i> Сводка</a>
+      <a class="ni {% if page == 'prodazhi' %}on{% endif %}" href="{% url 'prodazhi' %}"><i class="ti ti-trending-up"></i> Продажи</a>
+      <a class="ni {% if page == 'debitorka' %}on{% endif %}" href="{% url 'debitorka' %}"><i class="ti ti-receipt"></i> Дебиторка</a>
+      <a class="ni {% if page == 'oplaty' %}on{% endif %}" href="{% url 'oplaty' %}"><i class="ti ti-calendar-dollar"></i> График оплат</a>
+      <a class="ni {% if page == 'upakovka' %}on{% endif %}" href="{% url 'upakovka' %}"><i class="ti ti-package"></i> Упаковка</a>
+      <a class="ni {% if page == 'clients' %}on{% endif %}" href="{% url 'clients' %}"><i class="ti ti-users"></i> Клиенты</a>
       <div class="ng">Бета · в разработке</div>
-      <a class="ni {% if page == 'signals' %}on{% endif %}" href="{% url 'signals' %}">◔ Сигналы <span class="beta">beta</span></a>
-      <a class="ni {% if page == 'sravnenie' %}on{% endif %}" href="{% url 'sravnenie' %}">▦ По годам <span class="beta">beta</span></a>
-      <a class="ni {% if page == 'rfm' %}on{% endif %}" href="{% url 'rfm' %}">◑ Сегменты <span class="beta">beta</span></a>
-      <a class="ni {% if page == 'managers' %}on{% endif %}" href="{% url 'managers' %}">◎ Менеджеры <span class="beta">beta</span></a>
+      <a class="ni {% if page == 'signals' %}on{% endif %}" href="{% url 'signals' %}"><i class="ti ti-alert-triangle"></i> Сигналы <span class="beta">beta</span></a>
+      <a class="ni {% if page == 'sravnenie' %}on{% endif %}" href="{% url 'sravnenie' %}"><i class="ti ti-chart-bar"></i> По годам <span class="beta">beta</span></a>
+      <a class="ni {% if page == 'rfm' %}on{% endif %}" href="{% url 'rfm' %}"><i class="ti ti-chart-pie"></i> Сегменты <span class="beta">beta</span></a>
+      <a class="ni {% if page == 'managers' %}on{% endif %}" href="{% url 'managers' %}"><i class="ti ti-user-star"></i> Менеджеры <span class="beta">beta</span></a>
       {% if user.is_staff %}
       <div class="ng">Управление</div>
-      <a class="ni {% if page == 'upload' %}on{% endif %}" href="{% url 'upload' %}">⤴ Загрузить данные</a>
-      <a class="ni" href="/admin/">⚙ Админка</a>
+      <a class="ni {% if page == 'upload' %}on{% endif %}" href="{% url 'upload' %}"><i class="ti ti-cloud-upload"></i> Загрузить данные</a>
+      <a class="ni" href="/admin/"><i class="ti ti-settings"></i> Админка</a>
       {% endif %}
     </nav>
     <div class="usr">
-      <button class="themebtn" id="themeToggle" type="button"><span id="themeIcon">🌙</span> <span id="themeLabel">Тёмная тема</span></button>
+      <button class="themebtn" id="themeToggle" type="button"><i class="ti ti-moon" id="themeIcon"></i> <span id="themeLabel">Тёмная тема</span></button>
       {{ request.user.username }}<br><a href="{% url 'logout' %}">Выйти</a>
     </div>
   </aside>
@@ -213,7 +216,7 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
   });
   var tb=document.getElementById('themeToggle');
   function paint(){var d=document.body.classList.contains('dark');
-    document.getElementById('themeIcon').textContent=d?'☀':'🌙';
+    document.getElementById('themeIcon').className=d?'ti ti-sun':'ti ti-moon';
     document.getElementById('themeLabel').textContent=d?'Светлая тема':'Тёмная тема';}
   if(tb){paint();tb.addEventListener('click',function(){
     var d=document.body.classList.toggle('dark');
