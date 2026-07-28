@@ -1,0 +1,45 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Себестоимость{% endblock %}
+{% block content %}
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">Позиций с маржой</div><div class="kv">{{ c.mapped|length }}</div><div class="kf">себест из файла + цена продажи</div></div>
+  <div class="kpi"><div class="kl">Средняя маржа</div><div class="kv sm">{{ c.avg_margin }}<span class="cur">%</span></div><div class="kf">без НДС · по позициям</div></div>
+  <div class="kpi"><div class="kl">Не привязано</div><div class="kv sm {% if c.unmapped %}bad{% endif %}">{{ c.unmapped|length }}</div><div class="kf">нужен SKU для цены</div></div>
+  <div class="kpi"><div class="kl">НДС</div><div class="kv sm">+{{ c.vat_pct }}<span class="cur">%</span></div><div class="kf">себест в файле без НДС</div></div>
+</section>
+
+<div class="card wide">
+  <div class="ch"><span>Маржа по позициям</span><small>цена продажи {{ c.year }} · маржа считается без НДС · худшие сверху</small></div>
+  {% if c.mapped %}
+  <table>
+    <thead><tr><th>Позиция</th><th>Себест. без НДС</th><th>Себест. с НДС</th><th>Цена продажи</th><th>Маржа ₽</th><th>Маржа %</th></tr></thead>
+    <tbody>
+      {% for r in c.mapped %}<tr {% if r.mp < 15 %}class="bad"{% endif %}>
+        <td>{{ r.name }}</td>
+        <td>{{ r.cost|intcomma }} ₽</td>
+        <td>{{ r.cost_vat|intcomma }} ₽</td>
+        <td>{{ r.price|intcomma }} ₽ <span style="color:var(--ink2);font-size:11px">с НДС</span></td>
+        <td>{{ r.margin|intcomma }} ₽</td>
+        <td><b class="{% if r.mp < 15 %}bad{% elif r.mp >= 40 %}up{% endif %}">{{ r.mp }}%</b></td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="foot">Себестоимость — из твоего файла (без НДС), с НДС = +{{ c.vat_pct }}%. Маржа = цена без НДС − себестоимость без НДС. Красным — маржа ниже 15%. Себестоимость и привязку SKU правишь в админке → «Себестоимость».</div>
+  {% else %}<div class="foot">Нет привязанных позиций. Привяжи SKU в админке → «Себестоимость».</div>{% endif %}
+</div>
+
+{% if c.unmapped %}
+<div class="card wide" style="margin-top:14px">
+  <div class="ch"><span>Без привязки к цене</span><small>укажи SKU в админке, чтобы посчиталась маржа</small></div>
+  <table>
+    <thead><tr><th>Позиция</th><th>Линейка</th><th>Себест. без НДС</th><th>Себест. с НДС</th></tr></thead>
+    <tbody>
+      {% for r in c.unmapped %}<tr>
+        <td>{{ r.name }}</td><td style="color:var(--ink2)">{{ r.line }}</td>
+        <td>{{ r.cost|intcomma }} ₽</td><td>{{ r.cost_vat|intcomma }} ₽</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

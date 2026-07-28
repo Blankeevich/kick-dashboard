@@ -415,6 +415,34 @@ def rfm():
             'rows': data, 'total_clients': len(data)}
 
 
+def cost_margin(vat=0.22):
+    """Себестоимость + маржа по позициям: себест (без НДС и с НДС), цена продажи, маржа."""
+    from django.db.models import Max
+    from .models import CostItem
+    ly = SkuFact.objects.aggregate(y=Max('year'))['y']
+    price = {}
+    if ly:
+        for r in SkuFact.objects.filter(year=ly, qty__gt=0).values('sku_raw').annotate(a=Sum('amount'), q=Sum('qty')):
+            if r['q']:
+                price[r['sku_raw']] = r['a'] / r['q']       # цена с НДС
+    mapped, unmapped = [], []
+    for it in CostItem.objects.all():
+        cost_vat = round(it.cost * (1 + vat))
+        p = price.get(it.sku) if it.sku else None
+        row = {'line': it.line, 'name': it.name, 'cost': round(it.cost), 'cost_vat': cost_vat, 'sku': it.sku}
+        if p:
+            price_nv = p / (1 + vat)                          # цена без НДС
+            margin = price_nv - it.cost
+            row.update({'price': round(p), 'price_nv': round(price_nv), 'margin': round(margin),
+                        'mp': round(margin / price_nv * 100) if price_nv else 0})
+            mapped.append(row)
+        else:
+            unmapped.append(row)
+    mapped.sort(key=lambda r: r['mp'])
+    return {'mapped': mapped, 'unmapped': unmapped, 'year': ly, 'vat_pct': round(vat * 100),
+            'avg_margin': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0}
+
+
 def signals():
     """Сигналы «что требует внимания»: замолчавшие клиенты, рост долга, превышение лимита, падение SKU."""
     from datetime import timedelta

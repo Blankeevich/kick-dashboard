@@ -1,7 +1,29 @@
 from django import forms
 from django.contrib import admin
 from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
-                     SalesFact, DebtSnapshot, ManagerProfile)
+                     SalesFact, DebtSnapshot, ManagerProfile, CostItem, SkuFact)
+
+
+class CostItemForm(forms.ModelForm):
+    class Meta:
+        model = CostItem
+        fields = '__all__'
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        skus = sorted(set(SkuFact.objects.values_list('sku_raw', flat=True)))
+        self.fields['sku'] = forms.ChoiceField(
+            required=False, label='SKU для цены продажи',
+            choices=[('', '— не привязано —')] + [(s, s) for s in skus])
+
+
+@admin.register(CostItem)
+class CostItemAdmin(admin.ModelAdmin):
+    form = CostItemForm
+    list_display = ('name', 'line', 'cost', 'sku', 'updated_at')
+    list_filter = ('line',)
+    search_fields = ('name', 'sku')
+    list_editable = ('cost',)
 
 
 @admin.register(ManagerProfile)

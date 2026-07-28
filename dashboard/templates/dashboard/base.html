@@ -153,6 +153,7 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
       <a class="ni {% if page == 'sravnenie' %}on{% endif %}" href="{% url 'sravnenie' %}"><i class="ti ti-chart-bar"></i> По годам <span class="beta">beta</span></a>
       <a class="ni {% if page == 'rfm' %}on{% endif %}" href="{% url 'rfm' %}"><i class="ti ti-chart-pie"></i> Сегменты <span class="beta">beta</span></a>
       <a class="ni {% if page == 'managers' %}on{% endif %}" href="{% url 'managers' %}"><i class="ti ti-user-star"></i> Менеджеры <span class="beta">beta</span></a>
+      <a class="ni {% if page == 'cost' %}on{% endif %}" href="{% url 'cost' %}"><i class="ti ti-coin"></i> Себестоимость <span class="beta">beta</span></a>
       {% if user.is_staff %}
       <div class="ng">Управление</div>
       <a class="ni {% if page == 'upload' %}on{% endif %}" href="{% url 'upload' %}"><i class="ti ti-cloud-upload"></i> Загрузить данные</a>

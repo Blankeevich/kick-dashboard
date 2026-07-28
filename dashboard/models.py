@@ -226,6 +226,23 @@ class SalesPlan(models.Model):
         return f'{self.month:02d}.{self.year} {self.manager or "все"} — {self.amount:,} ₽'
 
 
+class CostItem(models.Model):
+    """Себестоимость позиции (без НДС) из файла + привязка к SKU для цены продажи."""
+    line = models.CharField('Линейка', max_length=100, blank=True)
+    name = models.CharField('Позиция (из файла себестоимости)', max_length=255, unique=True)
+    cost = models.FloatField('Себестоимость без НДС, ₽')
+    sku = models.CharField('SKU для цены продажи (карточка 1С)', max_length=255, blank=True, db_index=True)
+    updated_at = models.DateField('Обновлено', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Себестоимость'
+        verbose_name_plural = 'Себестоимость (справочник)'
+        ordering = ['line', 'name']
+
+    def __str__(self):
+        return self.name
+
+
 class PackagingItem(models.Model):
     """Справочник упаковки: связь с батончиком (для расхода по продажам) + остаток."""
     upak = models.CharField('Упаковка', max_length=255, unique=True)

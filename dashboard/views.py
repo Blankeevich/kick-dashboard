@@ -260,6 +260,11 @@ def rfm(request):
 
 
 @login_required
+def cost(request):
+    return render(request, 'dashboard/cost.html', {'page': 'cost', 'c': metrics.cost_margin()})
+
+
+@login_required
 def signals(request):
     return render(request, 'dashboard/signals.html',
                   {'page': 'signals', 's': metrics.signals(), 'cur_year': CUR_YEAR})
