@@ -251,6 +251,45 @@ def _matrix(base_qs, field, years, limit=10, exclude_docs=False):
     return rows[:limit]
 
 
+_SIZE_BUCKETS = [(0, 100000, '0–100к ₽'), (100000, 500000, '100к–500к ₽'), (500000, None, '500к+ ₽')]
+
+
+def _year_client_sales(year):
+    return {r['client']: (r['s'] or 0) for r in
+            SalesFact.objects.filter(year=year).exclude(client__in=_excluded())
+            .values('client').annotate(s=Sum('amount')) if (r['s'] or 0) > 0}
+
+
+def segments_matrix(years):
+    """Клиенты по размеру годовой выручки (корзины) × годы — количество."""
+    per = {y: _year_client_sales(y) for y in years}
+    out = []
+    for lo, hi, label in _SIZE_BUCKETS:
+        cells = []
+        for y in years:
+            cnt = sum(1 for v in per[y].values() if v >= lo and (hi is None or v < hi))
+            cells.append({'year': y, 'count': cnt})
+        out.append({'label': label, 'lo': lo, 'hi': hi or '', 'cells': cells})
+    return out
+
+
+def bucket_clients(year, lo, hi):
+    """Клиенты в корзине размера за год."""
+    rows = [{'name': c, 'sales': v} for c, v in _year_client_sales(year).items()
+            if v >= lo and (hi is None or v < hi)]
+    rows.sort(key=lambda r: -r['sales'])
+    return rows
+
+
+def lost_clients(year):
+    """Клиенты, которые покупали в предыдущем году, но не в этом (отток)."""
+    cur = set(_year_client_sales(year))
+    prev = _year_client_sales(year - 1)
+    rows = [{'name': c, 'sales': v} for c, v in prev.items() if c not in cur]
+    rows.sort(key=lambda r: -r['sales'])
+    return rows
+
+
 def year_overview():
     """Сводная аналитика по годам: выручка, сезонность, топы, база клиентов, СТМ."""
     from collections import defaultdict
@@ -314,7 +353,7 @@ def year_overview():
 
     return {'years': years, 'revenue': revenue, 'monthly': monthly, 'conc': conc,
             'top_clients': top_clients_m, 'top_managers': top_managers_m, 'top_sku': top_sku_m,
-            'base': base, 'stm': stm}
+            'base': base, 'stm': stm, 'segments': segments_matrix(years)}
 
 
 def yoy(year, prev, **f):

@@ -11,6 +11,7 @@ urlpatterns = [
     path('oplaty/', views.oplaty, name='oplaty'),
     path('oplaty/day/<day>/', views.oplaty_day, name='oplaty_day'),
     path('sravnenie/', views.sravnenie, name='sravnenie'),
+    path('sravnenie/drill/', views.sravnenie_drill, name='sravnenie_drill'),
     path('clients/', views.clients, name='clients'),
     path('clients/<path:client>/', views.client_card, name='client_card'),
     path('upakovka/', views.upakovka, name='upakovka'),

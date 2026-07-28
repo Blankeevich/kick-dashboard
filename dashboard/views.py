@@ -215,6 +215,30 @@ def sravnenie(request):
 
 
 @login_required
+def sravnenie_drill(request):
+    kind = request.GET.get('kind')
+    try:
+        year = int(request.GET.get('year'))
+    except (TypeError, ValueError):
+        year = CUR_YEAR
+    if kind == 'lost':
+        rows = metrics.lost_clients(year)
+        title = f'Клиенты, ушедшие в {year}'
+        sub = f'покупали в {year - 1}, но не в {year}'
+    else:
+        lo = int(request.GET.get('lo') or 0)
+        hi = request.GET.get('hi')
+        hi = int(hi) if hi else None
+        rows = metrics.bucket_clients(year, lo, hi)
+        rng = f'{lo // 1000}к–{hi // 1000}к' if hi else f'{lo // 1000}к+'
+        title = f'Клиенты {rng} ₽ · {year}'
+        sub = f'выручка за {year} в диапазоне {rng} ₽'
+    return render(request, 'dashboard/sravnenie_drill.html', {
+        'page': 'sravnenie', 'rows': rows, 'title': title, 'sub': sub,
+        'total': sum(r['sales'] for r in rows), 'year': year})
+
+
+@login_required
 def clients(request):
     q = (request.GET.get('q') or '').strip().lower()
     years, all_rows = metrics.clients_list(CUR_YEAR)

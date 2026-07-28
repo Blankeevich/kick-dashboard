@@ -79,10 +79,25 @@
         {% for b in ov.base %}<tr>
           <td>{{ b.year }}</td><td>{{ b.active }}</td>
           <td class="up">{% if b.new %}+{{ b.new }}{% else %}—{% endif %}</td>
-          <td class="bad">{% if b.lost %}−{{ b.lost }}{% else %}—{% endif %}</td>
+          <td>{% if b.lost %}<a href="{% url 'sravnenie_drill' %}?kind=lost&year={{ b.year }}" class="link bad">−{{ b.lost }} →</a>{% else %}—{% endif %}</td>
         </tr>{% endfor %}
       </tbody>
     </table>
+  </div>
+
+  <!-- КОРЗИНЫ ПО РАЗМЕРУ ЗАКАЗОВ -->
+  <div class="card wide">
+    <div class="ch"><span>Клиенты по размеру заказов</span><small>по годовой выручке · клик — список</small></div>
+    <table>
+      <thead><tr><th>Корзина</th>{% for y in ov.years %}<th>{{ y }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for s in ov.segments %}<tr>
+          <td>{{ s.label }}</td>
+          {% for c in s.cells %}<td>{% if c.count %}<a href="{% url 'sravnenie_drill' %}?kind=bucket&year={{ c.year }}&lo={{ s.lo }}&hi={{ s.hi }}" class="link">{{ c.count }} →</a>{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>{% endfor %}
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+    <div class="foot">Сколько клиентов в каждом диапазоне годовой выручки. Клик по числу — кто именно.</div>
   </div>
 
   <!-- СТМ -->
