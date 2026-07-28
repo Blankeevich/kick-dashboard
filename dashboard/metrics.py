@@ -458,6 +458,7 @@ def signals():
             def sums(months):
                 d = {}
                 for r in (SkuFact.objects.filter(year=last_y, month__in=months)
+                          .exclude(brand_type='private_label')      # без СТМ (контракт)
                           .values('sku_raw').annotate(s=Sum('amount'))):
                     if not str(r['sku_raw']).strip().startswith(_DOC_PREFIXES):
                         d[r['sku_raw']] = r['s'] or 0
