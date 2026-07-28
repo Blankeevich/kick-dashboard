@@ -132,8 +132,10 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
       <a class="ni {% if page == 'upakovka' %}on{% endif %}" href="{% url 'upakovka' %}">▣ Упаковка</a>
       <a class="ni {% if page == 'clients' %}on{% endif %}" href="{% url 'clients' %}">☺ Клиенты</a>
       <div class="ng">Управление</div>
+      {% if user.is_staff %}
       <a class="ni {% if page == 'upload' %}on{% endif %}" href="{% url 'upload' %}">⤴ Загрузить данные</a>
       <a class="ni" href="/admin/">⚙ Админка</a>
+      {% endif %}
       <div class="ng">Скоро</div>
       <span class="ni soon">○ Деньги</span>
     </nav>

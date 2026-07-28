@@ -1,6 +1,12 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Загрузить данные{% endblock %}
 {% block content %}
+{% if no_access %}
+<div class="card" style="max-width:640px">
+  <div class="ch"><span>Загрузка данных</span></div>
+  <div class="foot" style="margin-top:0">Загрузка данных доступна только администраторам. У вас доступ на просмотр.</div>
+</div>
+{% else %}
 <div class="card" style="max-width:640px">
   <div class="ch"><span>Загрузка выгрузок из 1С</span></div>
   <form method="post" enctype="multipart/form-data">
@@ -22,4 +28,5 @@
   {% if msg %}<div class="foot"><b>Результат:</b><ul>{% for m in msg %}<li>{{ m }}</li>{% endfor %}</ul></div>{% endif %}
   <div class="foot">Можно загрузить один или несколько файлов. Повторная загрузка того же файла пропускается. Новая выгрузка года заменяет старую.</div>
 </div>
+{% endif %}
 {% endblock %}

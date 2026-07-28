@@ -147,6 +147,9 @@ def debtor(request, client):
 
 @login_required
 def upload(request):
+    if not request.user.is_staff:                 # загрузка данных — только для админов
+        return render(request, 'dashboard/upload.html',
+                      {'page': 'upload', 'msg': [], 'no_access': True})
     msg = []
     if request.method == 'POST':
         fn_map = {'sales_client': loader.load_sales_client,
