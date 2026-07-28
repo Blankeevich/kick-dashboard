@@ -1,0 +1,58 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}{{ p.manager }}{% endblock %}
+{% block content %}
+<div style="margin-bottom:10px"><a href="{% url 'managers' %}" class="link">← все менеджеры</a></div>
+<h2 style="margin:0 0 14px;font-size:22px">{{ p.manager }}</h2>
+
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">Выручка {{ p.cur_year }}</div><div class="kv sm" style="font-size:20px">{{ p.sales_cur|intcomma }} <span class="cur">₽</span></div><div class="kf">{{ p.n_clients }} клиентов</div></div>
+  <div class="kpi"><div class="kl">Долг под ним</div><div class="kv sm">{{ p.debt_total|intcomma }} <span class="cur">₽</span></div><div class="kf">текущий</div></div>
+  <div class="kpi"><div class="kl">Замолчали</div><div class="kv sm {% if p.silent %}bad{% endif %}">{{ p.silent|length }}</div><div class="kf">крупные без заказов 60+ дн</div></div>
+</section>
+
+<section class="grid">
+  <div class="card">
+    <div class="ch"><span>Выручка по годам</span></div>
+    <div class="chart">
+      {% for b in p.by_year %}<div class="col"><div class="bars"><i class="now" style="height:{{ b.h }}%" data-tip="{{ b.year }}: {{ b.total|intcomma }} ₽"></i></div><span>{{ b.year }}</span></div>{% endfor %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span>План / факт</span><small>задаётся в админке</small></div>
+    {% if p.plans %}
+    <table>
+      <thead><tr><th>Месяц</th><th>План</th><th>Факт</th><th>%</th></tr></thead>
+      <tbody>{% for pl in p.plans %}<tr><td>{{ pl.month_name }}</td><td>{{ pl.plan|intcomma }}</td><td>{{ pl.fact|intcomma }}</td><td><b class="{% if pl.pct >= 100 %}up{% elif pl.pct < 70 %}bad{% endif %}">{{ pl.pct }}%</b></td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="foot">Планы для менеджера не заданы.</div>{% endif %}
+  </div>
+</section>
+
+{% if p.silent %}
+<div class="card wide">
+  <div class="ch"><span>🔴 Замолчали в портфеле</span><small>крупные клиенты без заказов 60+ дней</small></div>
+  <table>
+    <thead><tr><th>Клиент</th><th>Последний заказ</th><th>Дней</th><th>Выручка всего</th></tr></thead>
+    <tbody>
+      {% for r in p.silent %}<tr onclick="location.href='{% url 'client_card' r.client %}'" style="cursor:pointer"><td>{{ r.client }}</td><td>{{ r.last|date:"d.m.Y" }}</td><td><span class="pill {% if r.days > 180 %}red{% else %}amb{% endif %}">{{ r.days }} дн</span></td><td>{{ r.total|intcomma }} ₽</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card wide" style="margin-top:14px">
+  <div class="ch"><span>Клиенты менеджера</span><small>{{ p.n_clients }} · клик — карточка</small></div>
+  <table>
+    <thead><tr><th>Клиент</th><th>Выручка {{ p.cur_year }}</th><th>Выручка всего</th><th>Долг</th><th>Дней с заказа</th></tr></thead>
+    <tbody>
+      {% for r in p.clients %}<tr onclick="location.href='{% url 'client_card' r.client %}'" style="cursor:pointer">
+        <td>{{ r.client }}</td>
+        <td>{% if r.cy %}{{ r.cy|intcomma }} ₽{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>
+        <td>{{ r.total|intcomma }} ₽</td>
+        <td>{% if r.debt %}{{ r.debt|intcomma }} ₽{% else %}—{% endif %}</td>
+        <td>{% if r.days > 180 %}<span class="bad">{{ r.days }}</span>{% else %}{{ r.days }}{% endif %}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

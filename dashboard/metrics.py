@@ -308,6 +308,52 @@ def forgotten_clients(current_year):
     return rows
 
 
+def managers_list(year):
+    """Список менеджеров: выручка за год, клиентов, долг под ответственностью."""
+    from django.db.models import Count
+    excl = _excluded()
+    rows = {}
+    for r in (SalesFact.objects.filter(year=year).exclude(client__in=excl).exclude(manager='')
+              .values('manager').annotate(s=Sum('amount'), c=Count('client', distinct=True))):
+        rows[r['manager']] = {'manager': r['manager'], 'sales': r['s'] or 0, 'clients': r['c'], 'debt': 0}
+    snap = _latest_debt_date()
+    for r in (DebtFact.objects.filter(snapshot_date=snap).exclude(client__in=excl).exclude(manager='')
+              .values('manager').annotate(s=Sum('debt_total'))):
+        if r['manager'] in rows:
+            rows[r['manager']]['debt'] = r['s'] or 0
+        else:
+            rows[r['manager']] = {'manager': r['manager'], 'sales': 0, 'clients': 0, 'debt': r['s'] or 0}
+    return sorted(rows.values(), key=lambda x: -x['sales'])
+
+
+def manager_profile(manager):
+    """Портрет менеджера: выручка по годам, план/факт, его клиенты, кто замолчал, долг."""
+    from django.db.models import Max
+    excl = _excluded()
+    today = date.today()
+    years = sorted(set(SalesFact.objects.values_list('year', flat=True)))
+    cur_year = max(years) if years else None
+    by_year = [{'year': y, 'total': (SalesFact.objects.filter(manager=manager, year=y)
+                .exclude(client__in=excl).aggregate(s=Sum('amount'))['s'] or 0)} for y in years]
+    cli = {}
+    for r in (SalesFact.objects.filter(manager=manager, amount__gt=0, doc_date__isnull=False)
+              .exclude(client__in=excl).values('client').annotate(last=Max('doc_date'), tot=Sum('amount'))):
+        cli[r['client']] = {'last': r['last'], 'total': r['tot'], 'days': (today - r['last']).days}
+    cy = {r['client']: r['s'] for r in SalesFact.objects.filter(manager=manager, year=cur_year)
+          .exclude(client__in=excl).values('client').annotate(s=Sum('amount'))}
+    snap = _latest_debt_date()
+    db = {r['client']: r['s'] for r in DebtFact.objects.filter(snapshot_date=snap, manager=manager)
+          .values('client').annotate(s=Sum('debt_total'))}
+    rows = [{'client': c, 'cy': cy.get(c, 0), 'total': v['total'], 'days': v['days'],
+             'last': v['last'], 'debt': db.get(c, 0)} for c, v in cli.items()]
+    rows.sort(key=lambda r: -(r['cy'] or 0))
+    silent = sorted([r for r in rows if r['days'] >= 60 and r['total'] > 200000],
+                    key=lambda r: -r['total'])
+    return {'manager': manager, 'by_year': by_year, 'cur_year': cur_year,
+            'clients': rows, 'silent': silent, 'plans': plan_status(manager=manager),
+            'sales_cur': sum(cy.values()), 'debt_total': sum(db.values()), 'n_clients': len(rows)}
+
+
 def rfm():
     """RFM-сегментация + ABC клиентов на основе продаж (без новых данных)."""
     from datetime import date as _d

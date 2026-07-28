@@ -190,6 +190,21 @@ def upload(request):
 
 
 @login_required
+def managers(request):
+    return render(request, 'dashboard/managers.html',
+                  {'page': 'managers', 'rows': metrics.managers_list(CUR_YEAR), 'cur_year': CUR_YEAR})
+
+
+@login_required
+def manager_card(request, manager):
+    p = metrics.manager_profile(manager)
+    ymax = max([b['total'] for b in p['by_year']], default=1) or 1
+    for b in p['by_year']:
+        b['h'] = round(b['total'] / ymax * 100)
+    return render(request, 'dashboard/manager_card.html', {'page': 'managers', 'p': p})
+
+
+@login_required
 def rfm(request):
     data = metrics.rfm()
     seg = request.GET.get('seg') or ''
