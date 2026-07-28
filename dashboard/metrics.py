@@ -465,7 +465,7 @@ def signals():
             r3, p3 = sums(recent), sums(prior)
             for sku, pv in p3.items():
                 rv = r3.get(sku, 0)
-                if pv > 200000 and rv < pv * 0.6:
+                if pv > 50000 and rv < pv * 0.6:
                     sku_down.append({'sku': sku, 'was': pv, 'now': rv,
                                      'drop': round((pv - rv) / pv * 100)})
             sku_down.sort(key=lambda x: -(x['was'] - x['now']))
