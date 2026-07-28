@@ -193,7 +193,20 @@ def _parse_debt_new(rows, filename):
                               ship_date=_date(r[2]), due_date=_date(r[3]),
                               debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
                               overdue_days=int(_num(r[6]) or 0), bucket=bucket))
-    return facts, lines, total
+    # дедуп фантомных повторов: строка без номера, дублирующая ту же строку С номером
+    # (клиент+отгрузка+срок+сумма) — убираем, чтобы не задваивать график оплат/кошельки
+    numbered = {(l['client'], l['ship_date'], l['due_date'], l['debt_total'])
+                for l in lines if l['doc_no']}
+    seen, dedup = set(), []
+    for l in lines:
+        k = (l['client'], l['ship_date'], l['due_date'], l['debt_total'], l['doc_no'])
+        if not l['doc_no'] and k[:4] in numbered:
+            continue                         # безномерной дубль строки с номером
+        if k in seen:
+            continue                         # полный дубль (та же строка дважды)
+        seen.add(k)
+        dedup.append(l)
+    return facts, dedup, total
 
 
 def _parse_debt_old(rows):
