@@ -19,6 +19,7 @@ body{margin:0;background:#f0f0f2;font:100%/1.45 system-ui,-apple-system,"Segoe U
 .ni:hover{background:var(--sf2)}
 .ni.on{background:var(--pu2);color:var(--pu);font-weight:600}
 .ni.soon{color:var(--ink2);cursor:default}
+.beta{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--pu);background:var(--pu2);border-radius:5px;padding:1px 5px;margin-left:4px;vertical-align:middle}
 .usr{margin-top:auto;font-size:12px;color:var(--ink2)}
 .usr a{color:var(--pu);text-decoration:none}
 .main{padding:0 22px 22px;min-width:0}
@@ -126,22 +127,21 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
     <nav class="nav">
       <div class="ng">Обзор</div>
       <a class="ni {% if page == 'svodka' %}on{% endif %}" href="{% url 'svodka' %}">◧ Сводка</a>
-      <a class="ni {% if page == 'signals' %}on{% endif %}" href="{% url 'signals' %}">◔ Сигналы</a>
       <a class="ni {% if page == 'prodazhi' %}on{% endif %}" href="{% url 'prodazhi' %}">◈ Продажи</a>
-      <a class="ni {% if page == 'sravnenie' %}on{% endif %}" href="{% url 'sravnenie' %}">▦ По годам</a>
       <a class="ni {% if page == 'debitorka' %}on{% endif %}" href="{% url 'debitorka' %}">◆ Дебиторка</a>
       <a class="ni {% if page == 'oplaty' %}on{% endif %}" href="{% url 'oplaty' %}">▦ График оплат</a>
       <a class="ni {% if page == 'upakovka' %}on{% endif %}" href="{% url 'upakovka' %}">▣ Упаковка</a>
       <a class="ni {% if page == 'clients' %}on{% endif %}" href="{% url 'clients' %}">☺ Клиенты</a>
-      <a class="ni {% if page == 'rfm' %}on{% endif %}" href="{% url 'rfm' %}">◑ Сегменты</a>
-      <a class="ni {% if page == 'managers' %}on{% endif %}" href="{% url 'managers' %}">◎ Менеджеры</a>
-      <div class="ng">Управление</div>
+      <div class="ng">Бета · в разработке</div>
+      <a class="ni {% if page == 'signals' %}on{% endif %}" href="{% url 'signals' %}">◔ Сигналы <span class="beta">beta</span></a>
+      <a class="ni {% if page == 'sravnenie' %}on{% endif %}" href="{% url 'sravnenie' %}">▦ По годам <span class="beta">beta</span></a>
+      <a class="ni {% if page == 'rfm' %}on{% endif %}" href="{% url 'rfm' %}">◑ Сегменты <span class="beta">beta</span></a>
+      <a class="ni {% if page == 'managers' %}on{% endif %}" href="{% url 'managers' %}">◎ Менеджеры <span class="beta">beta</span></a>
       {% if user.is_staff %}
+      <div class="ng">Управление</div>
       <a class="ni {% if page == 'upload' %}on{% endif %}" href="{% url 'upload' %}">⤴ Загрузить данные</a>
       <a class="ni" href="/admin/">⚙ Админка</a>
       {% endif %}
-      <div class="ng">Скоро</div>
-      <span class="ni soon">○ Деньги</span>
     </nav>
     <div class="usr">{{ request.user.username }}<br><a href="{% url 'logout' %}">Выйти</a></div>
   </aside>
