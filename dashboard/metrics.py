@@ -233,6 +233,90 @@ def sales_years():
     return sorted(set(SalesFact.objects.values_list('year', flat=True)), reverse=True)
 
 
+def _matrix(base_qs, field, years, limit=10, exclude_docs=False):
+    """Топ-сущности (клиент/менеджер/SKU) × годы — матрица выручки."""
+    from collections import defaultdict
+    per = defaultdict(dict)
+    qs = base_qs.values(field, 'year').annotate(s=Sum('amount'))
+    for r in qs:
+        name = r[field]
+        if not name:
+            continue
+        if exclude_docs and str(name).strip().startswith(_DOC_PREFIXES):
+            continue
+        per[name][r['year']] = r['s'] or 0
+    rows = [{'name': k, 'by_year': [v.get(y, 0) for y in years], 'total': sum(v.values())}
+            for k, v in per.items()]
+    rows.sort(key=lambda r: -r['total'])
+    return rows[:limit]
+
+
+def year_overview():
+    """Сводная аналитика по годам: выручка, сезонность, топы, база клиентов, СТМ."""
+    from collections import defaultdict
+    excl = _excluded()
+    years = sorted(set(SalesFact.objects.values_list('year', flat=True)))
+    if not years:
+        return {'years': []}
+    sales_qs = SalesFact.objects.exclude(client__in=excl)
+
+    # выручка по годам + рост
+    tot = {y: 0 for y in years}
+    for r in sales_qs.values('year').annotate(s=Sum('amount')):
+        tot[r['year']] = r['s'] or 0
+    revenue = []
+    for i, y in enumerate(years):
+        prev = tot[years[i - 1]] if i else 0
+        growth = round((tot[y] - prev) / prev * 100) if i and prev else None
+        revenue.append({'year': y, 'total': tot[y], 'growth': growth})
+
+    # помесячно по годам (сезонность)
+    monthly = {y: [0] * 12 for y in years}
+    for r in sales_qs.values('year', 'month').annotate(s=Sum('amount')):
+        monthly[r['year']][r['month'] - 1] = r['s'] or 0
+
+    # топы × годы
+    top_clients_m = _matrix(sales_qs, 'client', years, 8)
+    top_managers_m = _matrix(sales_qs, 'manager', years, 8)
+    top_sku_m = _matrix(SkuFact.objects.all(), 'sku_raw', years, 8, exclude_docs=True)
+
+    # концентрация: доля топ-5 клиентов в каждом году
+    conc = []
+    for i, y in enumerate(years):
+        yr_clients = sorted((sales_qs.filter(year=y).values('client')
+                             .annotate(s=Sum('amount'))), key=lambda r: -(r['s'] or 0))
+        top5 = sum((r['s'] or 0) for r in yr_clients[:5])
+        conc.append(round(top5 / tot[y] * 100) if tot[y] else 0)
+
+    # клиентская база: активные / новые / ушедшие
+    client_years = defaultdict(set)
+    for r in sales_qs.filter(amount__gt=0).values('client', 'year').distinct():
+        client_years[r['client']].add(r['year'])
+    first_year = {c: min(ys) for c, ys in client_years.items()}
+    base = []
+    for i, y in enumerate(years):
+        active = {c for c, ys in client_years.items() if y in ys}
+        new = {c for c in active if first_year[c] == y}
+        prev_active = {c for c, ys in client_years.items() if years[i - 1] in ys} if i else set()
+        lost = prev_active - active
+        base.append({'year': y, 'active': len(active), 'new': len(new),
+                     'lost': (len(lost) if i else None)})
+
+    # СТМ vs свой бренд по годам (по типу карточки в SkuFact)
+    stm = []
+    for y in years:
+        bt = {'own': 0, 'private_label': 0, 'non_product': 0}
+        for r in SkuFact.objects.filter(year=y).values('brand_type').annotate(s=Sum('amount')):
+            bt[r['brand_type']] = r['s'] or 0
+        base_sum = bt['own'] + bt['private_label']
+        stm.append({'year': y, 'own': bt['own'], 'stm': bt['private_label'],
+                    'stm_share': round(bt['private_label'] / base_sum * 100) if base_sum else 0})
+
+    return {'years': years, 'revenue': revenue, 'monthly': monthly, 'conc': conc,
+            'top_clients': top_clients_m, 'top_managers': top_managers_m, 'top_sku': top_sku_m,
+            'base': base, 'stm': stm}
+
+
 def yoy(year, prev, **f):
     f2 = {k: v for k, v in f.items() if k not in ('date_from', 'date_to')}
     return {'now': sales_summary(year, **f2)['by_month'], 'prev': sales_summary(prev, **f2)['by_month']}

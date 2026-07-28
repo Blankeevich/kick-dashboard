@@ -1,0 +1,104 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}По годам{% endblock %}
+{% block content %}
+{% if not ov.years %}
+<div class="card"><div class="foot">Нет данных продаж. Загрузите выгрузки по контрагентам за нужные годы.</div></div>
+{% else %}
+
+<!-- ВЫРУЧКА ПО ГОДАМ -->
+<section class="kpis">
+  {% for r in ov.revenue %}
+  <div class="kpi {% if forloop.last %}hero{% endif %}">
+    <div class="kl">Выручка {{ r.year }}</div>
+    <div class="kv {% if not forloop.last %}sm{% endif %}">{{ r.total|intcomma }} <span class="cur">₽</span></div>
+    <div class="kf {% if r.growth < 0 %}bad{% elif r.growth > 0 %}up{% endif %}">{% if r.growth != None %}{% if r.growth > 0 %}▲{% else %}▼{% endif %} {{ r.growth }}% к {{ r.year|add:"-1" }}{% else %}—{% endif %}</div>
+  </div>
+  {% endfor %}
+</section>
+
+<!-- СЕЗОННОСТЬ: линии по годам -->
+<div class="card wide">
+  <div class="ch"><span>Помесячная динамика по годам</span>
+    <span style="font-size:11px;color:var(--ink2)">{% for l in ov.lines %}<span style="color:{{ l.color }}">●</span> {{ l.year }}&nbsp;&nbsp;{% endfor %}</span>
+  </div>
+  <svg viewBox="0 0 {{ ov.svg_w }} {{ ov.svg_h|add:20 }}" style="width:100%;height:220px">
+    {% for l in ov.lines %}<polyline points="{{ l.points }}" fill="none" stroke="{{ l.color }}" stroke-width="2" stroke-linejoin="round"/>{% endfor %}
+  </svg>
+  <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink2);padding:0 6px">
+    {% for m in months %}<span>{{ m }}</span>{% endfor %}
+  </div>
+</div>
+
+<section class="grid">
+  <!-- ТОП КЛИЕНТОВ ПО ГОДАМ -->
+  <div class="card wide">
+    <div class="ch"><span>Топ-8 клиентов по годам</span><small>выручка · концентрация топ-5 внизу</small></div>
+    <table>
+      <thead><tr><th>Клиент</th>{% for y in ov.years %}<th>{{ y }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for r in ov.top_clients %}<tr>
+          <td>{{ r.name }}</td>
+          {% for v in r.by_year %}<td>{% if v %}{{ v|intcomma }}{% else %}—{% endif %}</td>{% endfor %}
+        </tr>{% endfor %}
+        <tr style="border-top:2px solid var(--line)"><td style="color:var(--ink2)">Доля топ-5, %</td>{% for c in ov.conc %}<td><b>{{ c }}%</b></td>{% endfor %}</tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ТОП SKU ПО ГОДАМ -->
+  <div class="card wide">
+    <div class="ch"><span>Топ-8 SKU по годам</span><small>выручка по номенклатуре</small></div>
+    <table>
+      <thead><tr><th>SKU</th>{% for y in ov.years %}<th>{{ y }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for r in ov.top_sku %}<tr>
+          <td>{{ r.name }}</td>
+          {% for v in r.by_year %}<td>{% if v %}{{ v|intcomma }}{% else %}—{% endif %}</td>{% endfor %}
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- МЕНЕДЖЕРЫ ПО ГОДАМ -->
+  <div class="card">
+    <div class="ch"><span>Менеджеры по годам</span></div>
+    <table>
+      <thead><tr><th>Менеджер</th>{% for y in ov.years %}<th>{{ y }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for r in ov.top_managers %}<tr><td>{{ r.name }}</td>{% for v in r.by_year %}<td>{% if v %}{{ v|intcomma }}{% else %}—{% endif %}</td>{% endfor %}</tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- КЛИЕНТСКАЯ БАЗА -->
+  <div class="card">
+    <div class="ch"><span>Клиентская база</span><small>активные · новые · ушли</small></div>
+    <table>
+      <thead><tr><th>Год</th><th>Активных</th><th>Новых</th><th>Ушло</th></tr></thead>
+      <tbody>
+        {% for b in ov.base %}<tr>
+          <td>{{ b.year }}</td><td>{{ b.active }}</td>
+          <td class="up">{% if b.new %}+{{ b.new }}{% else %}—{% endif %}</td>
+          <td class="bad">{% if b.lost %}−{{ b.lost }}{% else %}—{% endif %}</td>
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- СТМ -->
+  <div class="card wide">
+    <div class="ch"><span>СТМ vs свой бренд по годам</span><small>доля контрактного производства</small></div>
+    <table>
+      <thead><tr><th>Год</th><th>Свой бренд</th><th>СТМ (контракт)</th><th>Доля СТМ</th></tr></thead>
+      <tbody>
+        {% for s in ov.stm %}<tr>
+          <td>{{ s.year }}</td><td>{{ s.own|intcomma }} ₽</td><td>{{ s.stm|intcomma }} ₽</td>
+          <td><b class="{% if s.stm_share >= 30 %}bad{% endif %}">{{ s.stm_share }}%</b></td>
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+    <div class="foot">Высокая доля СТМ — зависимость от контрактных заказчиков (ВкусВилл, Самокат и др.).</div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

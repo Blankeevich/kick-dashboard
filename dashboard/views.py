@@ -190,6 +190,31 @@ def upload(request):
 
 
 @login_required
+def sravnenie(request):
+    ov = metrics.year_overview()
+    if ov.get('years'):
+        gmax = max((max(v) for v in ov['monthly'].values()), default=1) or 1
+        palette = ['#d7cdec', '#b7a2e0', '#9670d0', '#783CBD', '#5a2c90']
+        W, H = 720, 200
+        lines = []
+        for idx, y in enumerate(ov['years']):
+            pts = []
+            for mi in range(12):
+                x = round(mi / 11 * (W - 20) + 10)
+                yy = round(H - (ov['monthly'][y][mi] / gmax) * (H - 24) - 10)
+                pts.append(f'{x},{yy}')
+            lines.append({'year': y, 'points': ' '.join(pts),
+                          'color': palette[idx % len(palette)]})
+        ov['lines'] = lines
+        ov['svg_w'], ov['svg_h'] = W, H
+        rmax = max((r['total'] for r in ov['revenue']), default=1) or 1
+        for r in ov['revenue']:
+            r['h'] = round(r['total'] / rmax * 100)
+    return render(request, 'dashboard/sravnenie.html', {'page': 'sravnenie', 'ov': ov,
+                  'months': MONTHS})
+
+
+@login_required
 def clients(request):
     q = (request.GET.get('q') or '').strip().lower()
     years, all_rows = metrics.clients_list(CUR_YEAR)
