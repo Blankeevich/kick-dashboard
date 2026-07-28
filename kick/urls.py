@@ -10,6 +10,7 @@ urlpatterns = [
     path('debitorka/', views.debitorka, name='debitorka'),
     path('oplaty/', views.oplaty, name='oplaty'),
     path('oplaty/day/<day>/', views.oplaty_day, name='oplaty_day'),
+    path('signals/', views.signals, name='signals'),
     path('sravnenie/', views.sravnenie, name='sravnenie'),
     path('sravnenie/drill/', views.sravnenie_drill, name='sravnenie_drill'),
     path('clients/', views.clients, name='clients'),

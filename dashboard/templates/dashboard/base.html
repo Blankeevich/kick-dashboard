@@ -126,6 +126,7 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
     <nav class="nav">
       <div class="ng">Обзор</div>
       <a class="ni {% if page == 'svodka' %}on{% endif %}" href="{% url 'svodka' %}">◧ Сводка</a>
+      <a class="ni {% if page == 'signals' %}on{% endif %}" href="{% url 'signals' %}">◔ Сигналы</a>
       <a class="ni {% if page == 'prodazhi' %}on{% endif %}" href="{% url 'prodazhi' %}">◈ Продажи</a>
       <a class="ni {% if page == 'sravnenie' %}on{% endif %}" href="{% url 'sravnenie' %}">▦ По годам</a>
       <a class="ni {% if page == 'debitorka' %}on{% endif %}" href="{% url 'debitorka' %}">◆ Дебиторка</a>

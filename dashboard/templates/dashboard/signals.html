@@ -1,0 +1,58 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Сигналы{% endblock %}
+{% block content %}
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">Сигналов всего</div><div class="kv">{{ s.total }}</div><div class="kf">требуют внимания</div></div>
+  <div class="kpi"><div class="kl">🔴 Замолчали</div><div class="kv sm">{{ s.silent|length }}</div><div class="kf">крупные без заказов ≥60 дн</div></div>
+  <div class="kpi"><div class="kl">🟠 Долг растёт</div><div class="kv sm">{{ s.debt_up|length }}</div><div class="kf">между снимками</div></div>
+  <div class="kpi"><div class="kl">⛔ Лимит / SKU</div><div class="kv sm">{{ s.over_limit|length }} / {{ s.sku_down|length }}</div><div class="kf">превышен / просел</div></div>
+</section>
+
+<section class="grid">
+  <div class="card wide">
+    <div class="ch"><span>🔴 Крупные клиенты замолчали</span><small>нет заказов 60+ дней · клик — карточка</small></div>
+    {% if s.silent %}
+    <table>
+      <thead><tr><th>Клиент</th><th>Последний заказ</th><th>Дней молчит</th><th>Выручка всего</th></tr></thead>
+      <tbody>
+        {% for r in s.silent %}<tr onclick="location.href='{% url 'client_card' r.client %}'" style="cursor:pointer" {% if r.days > 180 %}class="bad"{% endif %}>
+          <td>{{ r.client }}</td><td>{{ r.last|date:"d.m.Y" }}</td>
+          <td><span class="pill {% if r.days > 180 %}red{% else %}amb{% endif %}">{{ r.days }} дн</span></td>
+          <td>{{ r.total|intcomma }} ₽</td>
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="foot">Все крупные клиенты активны.</div>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="ch"><span>🟠 Долг растёт</span><small>vs предыдущий снимок</small></div>
+    {% if s.debt_up %}
+    <table>
+      <thead><tr><th>Клиент</th><th>Прирост долга</th></tr></thead>
+      <tbody>{% for r in s.debt_up %}<tr onclick="location.href='{% url 'client_card' r.client %}'" style="cursor:pointer"><td>{{ r.client }}</td><td class="bad">+{{ r.delta|intcomma }} ₽</td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="foot">Нет заметного роста долга (нужно ≥2 снимка).</div>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="ch"><span>⛔ Превышен лимит</span><small>долг больше кредитного лимита</small></div>
+    {% if s.over_limit %}
+    <table>
+      <thead><tr><th>Клиент</th><th>Долг / лимит</th><th>Сверх</th></tr></thead>
+      <tbody>{% for r in s.over_limit %}<tr onclick="location.href='{% url 'client_card' r.client %}'" style="cursor:pointer"><td>{{ r.client }}</td><td>{{ r.debt|intcomma }} / {{ r.limit|intcomma }}</td><td class="bad">+{{ r.over|intcomma }}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="foot">Превышений нет (лимиты ставятся в карточке клиента).</div>{% endif %}
+  </div>
+
+  <div class="card wide">
+    <div class="ch"><span>📉 SKU резко просели</span><small>последние 3 мес vs предыдущие 3</small></div>
+    {% if s.sku_down %}
+    <table>
+      <thead><tr><th>SKU</th><th>Было (3 мес)</th><th>Стало (3 мес)</th><th>Падение</th></tr></thead>
+      <tbody>{% for r in s.sku_down %}<tr class="bad"><td>{{ r.sku }}</td><td>{{ r.was|intcomma }} ₽</td><td>{{ r.now|intcomma }} ₽</td><td><b class="bad">−{{ r.drop }}%</b></td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="foot">Резких падений нет.</div>{% endif %}
+  </div>
+</section>
+{% endblock %}

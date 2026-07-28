@@ -308,6 +308,64 @@ def forgotten_clients(current_year):
     return rows
 
 
+def signals():
+    """Сигналы «что требует внимания»: замолчавшие клиенты, рост долга, превышение лимита, падение SKU."""
+    from datetime import timedelta
+    from django.db.models import Max, Count
+    today = date.today()
+    excl = _excluded()
+
+    # 1) крупный клиент замолчал (нет заказов ≥ 60 дней, историческая выручка значима)
+    silent = []
+    for r in (SalesFact.objects.exclude(client__in=excl).filter(doc_date__isnull=False, amount__gt=0)
+              .values('client').annotate(last=Max('doc_date'), tot=Sum('amount'))):
+        days = (today - r['last']).days
+        if days >= 60 and r['tot'] > 300000:
+            silent.append({'client': r['client'], 'days': days, 'last': r['last'], 'total': r['tot']})
+    silent.sort(key=lambda x: -x['total'])
+
+    # 2) долг растёт (между двумя последними снимками)
+    deltas, prev_d = debt_client_deltas(_latest_debt_date())
+    debt_up = sorted([{'client': c, 'delta': d} for c, d in deltas.items() if d > 50000],
+                     key=lambda x: -x['delta'])
+
+    # 3) превышен кредитный лимит
+    snap = _latest_debt_date()
+    debt_by = {r['client']: r['s'] for r in DebtFact.objects.filter(snapshot_date=snap)
+               .exclude(client__in=excl).values('client').annotate(s=Sum('debt_total'))}
+    over_limit = []
+    for cl in Client.objects.exclude(credit_limit__isnull=True):
+        dt = debt_by.get(cl.name, 0)
+        if cl.credit_limit and dt > cl.credit_limit:
+            over_limit.append({'client': cl.name, 'debt': dt, 'limit': cl.credit_limit,
+                               'over': dt - cl.credit_limit})
+    over_limit.sort(key=lambda x: -x['over'])
+
+    # 4) SKU резко просел (последние 3 мес vs предыдущие 3, по деньгам)
+    last_y = SkuFact.objects.aggregate(y=Max('year'))['y']
+    sku_down = []
+    if last_y:
+        mns = sorted(set(SkuFact.objects.filter(year=last_y).values_list('month', flat=True)))
+        recent, prior = mns[-3:], mns[-6:-3]
+        if len(recent) >= 2 and prior:
+            def sums(months):
+                d = {}
+                for r in (SkuFact.objects.filter(year=last_y, month__in=months)
+                          .values('sku_raw').annotate(s=Sum('amount'))):
+                    if not str(r['sku_raw']).strip().startswith(_DOC_PREFIXES):
+                        d[r['sku_raw']] = r['s'] or 0
+                return d
+            r3, p3 = sums(recent), sums(prior)
+            for sku, pv in p3.items():
+                rv = r3.get(sku, 0)
+                if pv > 200000 and rv < pv * 0.6:
+                    sku_down.append({'sku': sku, 'was': pv, 'now': rv,
+                                     'drop': round((pv - rv) / pv * 100)})
+            sku_down.sort(key=lambda x: -(x['was'] - x['now']))
+    return {'silent': silent, 'debt_up': debt_up, 'over_limit': over_limit, 'sku_down': sku_down,
+            'total': len(silent) + len(debt_up) + len(over_limit) + len(sku_down)}
+
+
 def year_overview():
     """Сводная аналитика по годам: выручка, сезонность, топы, база клиентов, СТМ."""
     from collections import defaultdict

@@ -190,6 +190,12 @@ def upload(request):
 
 
 @login_required
+def signals(request):
+    return render(request, 'dashboard/signals.html',
+                  {'page': 'signals', 's': metrics.signals(), 'cur_year': CUR_YEAR})
+
+
+@login_required
 def sravnenie(request):
     ov = metrics.year_overview()
     if ov.get('years'):
