@@ -210,8 +210,9 @@ def sravnenie(request):
         rmax = max((r['total'] for r in ov['revenue']), default=1) or 1
         for r in ov['revenue']:
             r['h'] = round(r['total'] / rmax * 100)
+    forgotten_n = len(metrics.forgotten_clients(CUR_YEAR)) if ov.get('years') else 0
     return render(request, 'dashboard/sravnenie.html', {'page': 'sravnenie', 'ov': ov,
-                  'months': MONTHS})
+                  'months': MONTHS, 'forgotten_n': forgotten_n, 'cur_year': CUR_YEAR})
 
 
 @login_required
@@ -221,7 +222,11 @@ def sravnenie_drill(request):
         year = int(request.GET.get('year'))
     except (TypeError, ValueError):
         year = CUR_YEAR
-    if kind == 'lost':
+    if kind == 'forgotten':
+        rows = metrics.forgotten_clients(year)
+        title = f'Забытые клиенты'
+        sub = f'покупали раньше, но в {year} — ни разу'
+    elif kind == 'lost':
         rows = metrics.lost_clients(year)
         title = f'Клиенты, ушедшие в {year}'
         sub = f'покупали в {year - 1}, но не в {year}'
@@ -231,8 +236,18 @@ def sravnenie_drill(request):
         hi = int(hi) if hi else None
         rows = metrics.bucket_clients(year, lo, hi)
         rng = f'{lo // 1000}к–{hi // 1000}к' if hi else f'{lo // 1000}к+'
-        title = f'Клиенты {rng} ₽ · {year}'
-        sub = f'выручка за {year} в диапазоне {rng} ₽'
+        absent = request.GET.get('absent') == '1'
+        if absent:                       # только те, кто в текущем году не заказывал
+            cur_set = set(metrics._year_client_sales(CUR_YEAR))
+            rows = [r for r in rows if r['name'] not in cur_set]
+        title = f'Клиенты {rng} ₽ · {year}' + (f' · не заказывали в {CUR_YEAR}' if absent else '')
+        sub = (f'из корзины {rng} за {year}, кто в {CUR_YEAR} не сделал ни заказа'
+               if absent else f'выручка за {year} в диапазоне {rng} ₽')
+        return render(request, 'dashboard/sravnenie_drill.html', {
+            'page': 'sravnenie', 'rows': rows, 'title': title, 'sub': sub,
+            'total': sum(r['sales'] for r in rows), 'year': year, 'bucket': True,
+            'lo': lo, 'hi': hi or '', 'absent': absent, 'cur_year': CUR_YEAR,
+            'show_absent': year != CUR_YEAR})
     return render(request, 'dashboard/sravnenie_drill.html', {
         'page': 'sravnenie', 'rows': rows, 'title': title, 'sub': sub,
         'total': sum(r['sales'] for r in rows), 'year': year})

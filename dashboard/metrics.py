@@ -290,6 +290,24 @@ def lost_clients(year):
     return rows
 
 
+def forgotten_clients(current_year):
+    """Забытые клиенты: покупали когда-либо раньше, но в текущем году — ни разу."""
+    from collections import defaultdict
+    excl = _excluded()
+    cur = set(SalesFact.objects.filter(year=current_year, amount__gt=0)
+              .exclude(client__in=excl).values_list('client', flat=True))
+    hist = defaultdict(lambda: {'total': 0, 'last': 0})
+    for r in (SalesFact.objects.filter(year__lt=current_year, amount__gt=0).exclude(client__in=excl)
+              .values('client', 'year').annotate(s=Sum('amount'))):
+        h = hist[r['client']]
+        h['total'] += r['s'] or 0
+        h['last'] = max(h['last'], r['year'])
+    rows = [{'name': c, 'sales': d['total'], 'last': d['last']}
+            for c, d in hist.items() if c not in cur]
+    rows.sort(key=lambda r: -r['sales'])
+    return rows
+
+
 def year_overview():
     """Сводная аналитика по годам: выручка, сезонность, топы, база клиентов, СТМ."""
     from collections import defaultdict

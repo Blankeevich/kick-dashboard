@@ -85,6 +85,15 @@
     </table>
   </div>
 
+  <!-- ЗАБЫТЫЕ КЛИЕНТЫ -->
+  <div class="card">
+    <div class="ch"><span>Забытые клиенты</span><small>не заказывали в {{ cur_year }}</small></div>
+    <div style="padding:6px 2px">
+      <div style="font-size:30px;font-weight:800;color:var(--pu)">{{ forgotten_n }}</div>
+      <div class="foot" style="margin-top:2px">Покупали раньше, но в {{ cur_year }} — ни разу. <a href="{% url 'sravnenie_drill' %}?kind=forgotten&year={{ cur_year }}" class="link">кто именно →</a></div>
+    </div>
+  </div>
+
   <!-- КОРЗИНЫ ПО РАЗМЕРУ ЗАКАЗОВ -->
   <div class="card wide">
     <div class="ch"><span>Клиенты по размеру заказов</span><small>по годовой выручке · клик — список</small></div>

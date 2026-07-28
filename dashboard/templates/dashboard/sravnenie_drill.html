@@ -6,14 +6,23 @@
   <div class="kpi hero"><div class="kl">{{ title }}</div><div class="kv sm" style="font-size:20px">{{ rows|length }}</div><div class="kf">{{ sub }}</div></div>
   <div class="kpi"><div class="kl">Суммарно</div><div class="kv sm">{{ total|intcomma }} <span class="cur">₽</span></div><div class="kf">выручка за {{ year }}{% if not rows %} · нет{% endif %}</div></div>
 </section>
+{% if show_absent %}
+<div style="margin-bottom:12px">
+  {% if absent %}
+  <a href="{% url 'sravnenie_drill' %}?kind=bucket&year={{ year }}&lo={{ lo }}&hi={{ hi }}" class="perbtn on">✓ только не заказывавшие в {{ cur_year }}</a>
+  {% else %}
+  <a href="{% url 'sravnenie_drill' %}?kind=bucket&year={{ year }}&lo={{ lo }}&hi={{ hi }}&absent=1" class="perbtn">показать только тех, кто не заказывал в {{ cur_year }}</a>
+  {% endif %}
+</div>
+{% endif %}
 <div class="card wide">
   <div class="ch"><span>Список клиентов</span><small>клик — карточка клиента</small></div>
   {% if rows %}
   <table>
-    <thead><tr><th>Клиент</th><th>Выручка {{ year }}{% if not rows.0.sales %} (пред.){% endif %}</th></tr></thead>
+    <thead><tr><th>Клиент</th><th>Выручка всего</th>{% if rows.0.last %}<th>Последний заказ</th>{% endif %}</tr></thead>
     <tbody>
       {% for r in rows %}<tr onclick="location.href='{% url 'client_card' r.name %}'" style="cursor:pointer">
-        <td>{{ r.name }}</td><td>{{ r.sales|intcomma }} ₽</td>
+        <td>{{ r.name }}</td><td>{{ r.sales|intcomma }} ₽</td>{% if rows.0.last %}<td>{{ r.last }} г.</td>{% endif %}
       </tr>{% endfor %}
     </tbody>
   </table>
