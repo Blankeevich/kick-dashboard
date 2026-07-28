@@ -24,6 +24,7 @@
       <a href="?abc=B{% if sel_seg %}&seg={{ sel_seg|urlencode }}{% endif %}" class="perbtn {% if sel_abc == 'B' %}on{% endif %}">B</a>
       <a href="?abc=C{% if sel_seg %}&seg={{ sel_seg|urlencode }}{% endif %}" class="perbtn {% if sel_abc == 'C' %}on{% endif %}">C</a>
       {% if sel_seg or sel_abc %}· <a href="{% url 'rfm' %}" class="link">сбросить</a>{% endif %}
+      · <a href="{% url 'export' %}?kind=rfm" class="link">⤓ Excel</a>
     </span>
   </div>
   <table>

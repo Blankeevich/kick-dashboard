@@ -12,7 +12,7 @@
 <div class="card wide">
   <div class="ch">
     <span>{% if q %}Найдено: {{ found }}{% else %}Все клиенты{% endif %}</span>
-    <small>{% if q %}<a href="{% url 'clients' %}" class="link">сбросить поиск</a> · {% endif %}всего в базе {{ total_clients }}</small>
+    <small>{% if q %}<a href="{% url 'clients' %}" class="link">сбросить поиск</a> · {% endif %}всего в базе {{ total_clients }} · <a href="{% url 'export' %}?kind=clients" class="link">⤓ Excel</a></small>
   </div>
   <table>
     <thead><tr><th>Клиент</th><th>ИНН</th><th>Канал</th>{% for y in years %}<th>Продажи {{ y }}</th>{% endfor %}<th>Долг</th><th>Просрочено</th></tr></thead>

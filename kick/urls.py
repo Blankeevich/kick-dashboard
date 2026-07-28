@@ -12,6 +12,7 @@ urlpatterns = [
     path('oplaty/day/<day>/', views.oplaty_day, name='oplaty_day'),
     path('signals/', views.signals, name='signals'),
     path('rfm/', views.rfm, name='rfm'),
+    path('export/', views.export_xlsx, name='export'),
     path('managers/', views.managers, name='managers'),
     path('managers/<path:manager>/', views.manager_card, name='manager_card'),
     path('sravnenie/', views.sravnenie, name='sravnenie'),

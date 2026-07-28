@@ -588,6 +588,33 @@ def payment_calendar(year, month):
     return {'weeks': weeks, 'month_total': month_total, 'doc_count': sum(by_date[d]['count'] for d in month_days)}
 
 
+def payment_forecast(weeks=8):
+    """Прогноз поступлений по неделям вперёд (из сроков оплаты дебиторки, последний снимок)."""
+    from datetime import timedelta
+    from .models import DebtLine
+    snap = _latest_debt_date()
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    end = monday + timedelta(days=7 * weeks)
+    buckets = [{'start': monday + timedelta(days=7 * i),
+                'end': monday + timedelta(days=7 * i + 6), 'amount': 0} for i in range(weeks)]
+    overdue = later = 0
+    for l in (DebtLine.objects.filter(snapshot_date=snap, due_date__isnull=False)
+              .values('due_date', 'debt_total')):
+        d = l['due_date']
+        if d < monday:
+            overdue += l['debt_total']
+        elif d >= end:
+            later += l['debt_total']
+        else:
+            buckets[(d - monday).days // 7]['amount'] += l['debt_total']
+    mx = max([b['amount'] for b in buckets] + [overdue], default=1) or 1
+    for b in buckets:
+        b['h'] = round(b['amount'] / mx * 100)
+    return {'overdue': overdue, 'weeks': buckets, 'later': later, 'today': today,
+            'total_8w': sum(b['amount'] for b in buckets)}
+
+
 def payment_day(d):
     """Кто должен оплатить в конкретный день и за какие отгрузки (документы с этим сроком оплаты)."""
     from .models import DebtLine

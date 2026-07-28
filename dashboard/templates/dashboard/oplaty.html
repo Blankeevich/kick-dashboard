@@ -7,6 +7,15 @@
 </section>
 
 <div class="card wide">
+  <div class="ch"><span>Прогноз поступлений по неделям</span><small>ожидаемые оплаты по сроку · на 8 недель вперёд</small></div>
+  <div class="day-chart">
+    {% if forecast.overdue %}<div class="dc" data-tip="Просрочено (ждём): {{ forecast.overdue|intcomma }} ₽"><i style="height:100%;background:var(--redb)"></i><span>просроч</span></div>{% endif %}
+    {% for w in forecast.weeks %}<div class="dc" data-tip="Неделя {{ w.start|date:'d.m' }}–{{ w.end|date:'d.m' }}: {{ w.amount|intcomma }} ₽"><i style="height:{{ w.h }}%"></i><span>{{ w.start|date:'d.m' }}</span></div>{% endfor %}
+  </div>
+  <div class="foot">🔴 просрочено (ждём): {{ forecast.overdue|intcomma }} ₽ · за 8 недель ожидается {{ forecast.total_8w|intcomma }} ₽ · дальше {{ forecast.later|intcomma }} ₽. Ожидаемые оплаты по сроку из дебиторки.</div>
+</div>
+
+<div class="card wide">
   <div class="calhead">
     <a class="calnav" href="?ym={{ prev_ym }}">←</a>
     <b style="font-size:16px;text-transform:capitalize">{{ month_name }} {{ year }}</b>

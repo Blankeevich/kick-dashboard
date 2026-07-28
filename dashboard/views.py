@@ -190,6 +190,44 @@ def upload(request):
 
 
 @login_required
+def export_xlsx(request):
+    import io
+    import openpyxl
+    from django.http import HttpResponse
+    kind = request.GET.get('kind', 'clients')
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    if kind == 'debt':
+        ws.title = 'Дебиторка'
+        d = metrics.debt_summary()
+        ws.append(['Клиент', 'Долг', 'Просрочено', 'Дней просрочки', 'Срок оплаты', 'Менеджер'])
+        for x in d['debtors']:
+            ws.append([x['client'], x['debt_total'], x['debt_overdue'], x['overdue_days'],
+                       x['due_date'].strftime('%d.%m.%Y') if x['due_date'] else '', x['manager']])
+    elif kind == 'rfm':
+        ws.title = 'Сегменты'
+        data = metrics.rfm()
+        ws.append(['Клиент', 'Сегмент', 'ABC', 'Последний заказ', 'Дней', 'Заказов', 'Выручка'])
+        for r in data['rows']:
+            ws.append([r['client'], r['seg'], r['abc'], r['last'].strftime('%d.%m.%Y'),
+                       r['r_days'], r['f'], r['m']])
+    else:
+        kind = 'clients'
+        ws.title = 'Клиенты'
+        years, rows = metrics.clients_list(CUR_YEAR)
+        ws.append(['Клиент', 'ИНН', 'Канал'] + [f'Продажи {y}' for y in years] + ['Долг', 'Просрочено'])
+        for r in rows:
+            ws.append([r['name'], r['inn'], r['channel']] + r['by_year'] + [r['debt'], r['overdue']])
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    resp = HttpResponse(bio.read(),
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    resp['Content-Disposition'] = f'attachment; filename="{kind}.xlsx"'
+    return resp
+
+
+@login_required
 def managers(request):
     return render(request, 'dashboard/managers.html',
                   {'page': 'managers', 'rows': metrics.managers_list(CUR_YEAR), 'cur_year': CUR_YEAR})
@@ -363,6 +401,7 @@ def oplaty(request):
         'page': 'oplaty', 'cal': cal, 'month_name': MONTHS_FULL[m - 1], 'year': y,
         'prev_ym': f'{prev.year}-{prev.month:02d}', 'next_ym': f'{nxt.year}-{nxt.month:02d}',
         'weekdays': ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+        'forecast': metrics.payment_forecast(8),
         'last_debt': Upload.objects.filter(kind='debt').order_by('-uploaded_at').first(),
     })
 
