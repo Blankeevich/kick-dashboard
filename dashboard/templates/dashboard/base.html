@@ -72,6 +72,13 @@ tr.bad td{background:rgba(194,65,12,.05)}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--ink2)}
 .dot.green{background:var(--grn)}.dot.amb{background:#f79009}.dot.red{background:var(--redb)}
 .warnbox{margin-top:10px;font-size:12px;color:var(--red);background:rgba(194,65,12,.06);padding:9px 11px;border-radius:9px}
+.themebtn{display:flex;align-items:center;gap:8px;width:100%;background:var(--sf2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:12.5px;color:var(--ink);cursor:pointer;margin-bottom:8px}
+.themebtn:hover{border-color:var(--pu)}
+body.dark{background:#191714;color:#ece9e3}
+body.dark .app{--pu:#a68fe3;--pu2:rgba(166,143,227,.16);--ink:#ece9e3;--ink2:#9c968b;--line:rgba(255,255,255,.10);--sf:#242119;--sf2:#1e1c17;--red:#f0997b;--redb:#f0997b;--amb:#e0a94e;--grn:#5dca8f}
+body.dark .top{background:rgba(25,23,20,.85)}
+body.dark .warnbox{background:rgba(240,153,123,.08)}
+body.dark .kpi.hero,body.dark .ai{background:#4a3b7d}
 .btn{display:inline-block;background:var(--pu);color:#fff;border:0;border-radius:9px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none}
 .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
 .filters select{font:inherit;font-size:12.5px;color:var(--ink);background:var(--sf);border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer;max-width:220px}
@@ -122,6 +129,7 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
 </style>
 </head>
 <body>
+<script>if(localStorage.getItem('kick_theme')==='dark')document.body.classList.add('dark');</script>
 <div class="app">
   <aside class="side">
     <div class="brand"><div class="logo">K</div><div><div class="bn">KICK</div><div class="bs">Панель управления</div></div></div>
@@ -144,7 +152,10 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
       <a class="ni" href="/admin/">⚙ Админка</a>
       {% endif %}
     </nav>
-    <div class="usr">{{ request.user.username }}<br><a href="{% url 'logout' %}">Выйти</a></div>
+    <div class="usr">
+      <button class="themebtn" id="themeToggle" type="button"><span id="themeIcon">🌙</span> <span id="themeLabel">Тёмная тема</span></button>
+      {{ request.user.username }}<br><a href="{% url 'logout' %}">Выйти</a>
+    </div>
   </aside>
   <main class="main">
     <header class="top">
@@ -200,6 +211,13 @@ tbody tr[onclick]{cursor:pointer}tbody tr[onclick]:hover td{background:var(--sf2
   document.addEventListener('mouseout',function(e){
     if(e.target.closest('[data-tip]'))tip.classList.remove('on');
   });
+  var tb=document.getElementById('themeToggle');
+  function paint(){var d=document.body.classList.contains('dark');
+    document.getElementById('themeIcon').textContent=d?'☀':'🌙';
+    document.getElementById('themeLabel').textContent=d?'Светлая тема':'Тёмная тема';}
+  if(tb){paint();tb.addEventListener('click',function(){
+    var d=document.body.classList.toggle('dark');
+    localStorage.setItem('kick_theme',d?'dark':'light');paint();});}
 })();
 </script>
 </body>
