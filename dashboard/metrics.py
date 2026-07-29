@@ -440,7 +440,15 @@ def cost_margin(vat=0.22):
     mapped, unmapped = [], []
     for it in CostItem.objects.prefetch_related('skus'):
         cost_vat = round(it.cost * (1 + vat))
-        skus = list(dict.fromkeys([s for s in ([it.sku] + [x.sku for x in it.skus.all()]) if s]))
+        skus, seen_n = [], set()          # дедуп по нормализованному имени (свой vs «, шт» — одно)
+        for s in [it.sku] + [x.sku for x in it.skus.all()]:
+            if not s:
+                continue
+            k = _n(s)
+            if k in seen_n:
+                continue
+            seen_n.add(k)
+            skus.append(s)
         matched = False
         for s in skus:
             p = price.get(_n(s))
