@@ -1,12 +1,13 @@
 {% extends 'dashboard/base.html' %}{% load humanize %}
 {% block title %}Себестоимость{% endblock %}
 {% block content %}
+{% if not report %}
 <section class="kpis">
   <div class="kpi hero"><div class="kl">Позиций с маржой</div><div class="kv">{{ c.mapped|length }}</div><div class="kf">себест из файла + цена продажи</div></div>
-  <div class="kpi"><div class="kl">Средняя маржа</div><div class="kv sm">{{ c.avg_margin }}<span class="cur">%</span></div><div class="kf">без НДС</div></div>
-  <div class="kpi"><div class="kl">Не привязано</div><div class="kv sm {% if c.unmapped %}bad{% endif %}">{{ c.unmapped|length }}</div><div class="kf"><a href="{% url 'cost_map' %}" class="link">привязать SKU →</a></div></div>
+  <div class="kpi"><div class="kl">Средняя маржа</div><div class="kv sm">{{ c.avg_margin }}<span class="cur">%</span></div><div class="kf">по позициям</div></div>
   <div class="kpi"><div class="kl">НДС</div><div class="kv sm">+{{ c.vat_pct }}<span class="cur">%</span></div><div class="kf">себест в файле без НДС</div></div>
 </section>
+{% endif %}
 
 <div class="filters" style="margin:0 0 14px">
   <span class="perlbl">Группа:</span>
@@ -23,11 +24,11 @@
 {% if report %}
 <section class="kpis">
   <div class="kpi hero"><div class="kl">Позиций</div><div class="kv">{{ report.rows|length }}</div><div class="kf">по реальным продажам</div></div>
-  <div class="kpi"><div class="kl">Выручка (без НДС)</div><div class="kv sm">{{ report.total_rev|intcomma }} <span class="cur">₽</span></div><div class="kf">{{ report_label }}</div></div>
-  <div class="kpi"><div class="kl">Маржа</div><div class="kv sm">{{ report.total_margin|intcomma }} <span class="cur">₽</span></div><div class="kf">где привязана себест.</div></div>
+  <div class="kpi"><div class="kl">Выручка (с НДС)</div><div class="kv sm">{{ report.total_rev|intcomma }} <span class="cur">₽</span></div><div class="kf">{{ report_label }}</div></div>
+  <div class="kpi"><div class="kl">Маржа (с НДС)</div><div class="kv sm">{{ report.total_margin|intcomma }} <span class="cur">₽</span></div><div class="kf">где привязана себест.</div></div>
 </section>
 <div class="card wide">
-  <div class="ch"><span>Что продаётся — {{ report_label }}</span><small>реальные продажи × себестоимость рецепта</small></div>
+  <div class="ch"><span>Что продаётся — {{ report_label }}</span><small>всё с НДС · себестоимость рецепта +22%</small></div>
   {% if report.rows %}
   <table>
     <thead><tr><th>Позиция (SKU)</th><th>Объём, шт</th><th>Выручка</th><th>Цена/шт</th><th>Себест./шт</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>
@@ -62,11 +63,10 @@
   <div class="ch"><span>Маржа по позициям{% if sel_group %}: {{ sel_group.name }}{% endif %}</span><small>одна позиция — одна строка · <a href="{% url 'cost_map' %}" class="link">привязать SKU →</a></small></div>
   {% if c.mapped %}
   <table>
-    <thead><tr><th>Позиция</th><th>Себест. без НДС</th><th>Себест. с НДС</th><th>Цена продажи</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>
+    <thead><tr><th>Позиция</th><th>Себестоимость</th><th>Цена продажи</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>
     <tbody>
       {% for r in c.mapped %}<tr {% if r.mp < 15 %}class="bad"{% endif %}>
         <td>{{ r.name }}</td>
-        <td>{{ r.cost|intcomma }} ₽</td>
         <td>{{ r.cost_vat|intcomma }} ₽</td>
         <td>{{ r.price|intcomma }} ₽</td>
         <td>{{ r.margin|intcomma }} ₽</td>
@@ -74,7 +74,7 @@
       </tr>{% endfor %}
     </tbody>
   </table>
-  <div class="foot">Цена — по своему бренду (первый привязанный SKU с продажами). Маржа = цена без НДС − себестоимость. Красным — ниже 15%. Разбивку по СТМ/сетям смотри в «Маржа по каналам».</div>
+  <div class="foot">Всё с НДС. Себестоимость = из файла +22%. Цена — по своему бренду (первый привязанный SKU с продажами). Красным — маржа ниже 15%. Разрез по группам/менеджерам — селектором выше.</div>
   {% else %}<div class="foot">Нет привязанных позиций. <a href="{% url 'cost_map' %}" class="link">Привяжи SKU →</a></div>{% endif %}
 </div>
 
@@ -82,14 +82,14 @@
 <div class="card wide" style="margin-top:14px">
   <div class="ch"><span>Без привязки к цене</span><small><a href="{% url 'cost_map' %}" class="link">привязать SKU →</a></small></div>
   <table>
-    <thead><tr><th>Позиция</th><th>Линейка</th><th>Себест. без НДС</th><th>Себест. с НДС</th></tr></thead>
-    <tbody>{% for r in c.unmapped %}<tr><td>{{ r.name }}</td><td style="color:var(--ink2)">{{ r.line }}</td><td>{{ r.cost|intcomma }} ₽</td><td>{{ r.cost_vat|intcomma }} ₽</td></tr>{% endfor %}</tbody>
+    <thead><tr><th>Позиция</th><th>Линейка</th><th>Себестоимость (с НДС)</th></tr></thead>
+    <tbody>{% for r in c.unmapped %}<tr><td>{{ r.name }}</td><td style="color:var(--ink2)">{{ r.line }}</td><td>{{ r.cost_vat|intcomma }} ₽</td></tr>{% endfor %}</tbody>
   </table>
 </div>
 {% endif %}
 
 {% endif %}
-<script id="ddata" type="application/json">[{% for r in c.mapped %}{"n":"{{ r.name|escapejs }}","cost":{{ r.cost }},"price":{{ r.price }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
+<script id="ddata" type="application/json">[{% for r in c.mapped %}{"n":"{{ r.name|escapejs }}","cost":{{ r.cost_vat }},"price":{{ r.price }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
 <script>
 (function(){
   var data=JSON.parse(document.getElementById('ddata').textContent||'[]');
@@ -99,12 +99,12 @@
   function fmt(n){return Math.round(n).toLocaleString('ru-RU');}
   function calc(){
     var d=data[pos.value], k=Math.max(0,Math.min(60,parseFloat(disc.value)||0));
-    var np=d.price*(1-k/100), nnv=np/1.22, m=nnv-d.cost, mp=nnv?Math.round(m/nnv*100):0;
-    var zero=d.price>0?Math.round((1-d.cost*1.22/d.price)*100):0;
+    var np=d.price*(1-k/100), m=np-d.cost, mp=np?Math.round(m/np*100):0;
+    var zero=d.price>0?Math.round((1-d.cost/d.price)*100):0;
     out.innerHTML=
-      '<div><div style="color:var(--ink2)">Цена со скидкой</div><b style="font-size:18px">'+fmt(np)+' ₽</b></div>'+
-      '<div><div style="color:var(--ink2)">Маржа</div><b style="font-size:18px" class="'+(mp<15?'bad':'up')+'">'+fmt(m)+' ₽ · '+mp+'%</b></div>'+
-      '<div><div style="color:var(--ink2)">Себестоимость (без НДС)</div><b style="font-size:18px">'+fmt(d.cost)+' ₽</b></div>'+
+      '<div><div style="color:var(--ink2)">Цена со скидкой (с НДС)</div><b style="font-size:18px">'+fmt(np)+' ₽</b></div>'+
+      '<div><div style="color:var(--ink2)">Маржа (с НДС)</div><b style="font-size:18px" class="'+(mp<15?'bad':'up')+'">'+fmt(m)+' ₽ · '+mp+'%</b></div>'+
+      '<div><div style="color:var(--ink2)">Себестоимость (с НДС)</div><b style="font-size:18px">'+fmt(d.cost)+' ₽</b></div>'+
       '<div><div style="color:var(--ink2)">Скидка до нуля маржи</div><b style="font-size:18px" class="'+(k>=zero?'bad':'')+'">'+zero+'%</b></div>';
   }
   pos.addEventListener('change',calc); disc.addEventListener('input',calc); calc();

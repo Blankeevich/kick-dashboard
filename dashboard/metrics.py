@@ -445,14 +445,12 @@ def cost_margin(vat=0.22, group=None):
                 p = price[_n(s)]
                 break
         if p:
-            price_nv = p / (1 + vat)
-            margin = price_nv - it.cost
+            margin = p - cost_vat               # маржа с НДС
             mapped.append({'line': it.line, 'name': it.name,
-                           'cost': round(it.cost), 'cost_vat': cost_vat, 'price': round(p),
-                           'price_nv': round(price_nv), 'margin': round(margin),
-                           'mp': round(margin / price_nv * 100) if price_nv else 0})
+                           'cost_vat': cost_vat, 'price': round(p), 'margin': round(margin),
+                           'mp': round(margin / p * 100) if p else 0})
         else:
-            unmapped.append({'line': it.line, 'name': it.name, 'cost': round(it.cost), 'cost_vat': cost_vat})
+            unmapped.append({'line': it.line, 'name': it.name, 'cost_vat': cost_vat})
     mapped.sort(key=lambda r: r['mp'])
     return {'mapped': mapped, 'unmapped': unmapped, 'year': ly, 'vat_pct': round(vat * 100),
             'avg_margin': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0}
@@ -499,18 +497,18 @@ def _purchases_margin(docs, vat=0.22):
     for sku, v in agg.items():
         if v['qty'] <= 0:
             continue
-        price = v['amount'] / v['qty']
-        price_nv = price / (1 + vat)
+        price = v['amount'] / v['qty']          # цена с НДС
         cost = cost_by.get(_n(sku))
+        cost_vat = cost * (1 + vat) if cost is not None else None
         r = {'sku': sku, 'qty': int(v['qty']), 'revenue': round(v['amount']),
-             'price': round(price), 'cost': round(cost) if cost is not None else None}
-        if cost is not None:
-            margin = price_nv - cost
+             'price': round(price), 'cost': round(cost_vat) if cost_vat is not None else None}
+        if cost_vat is not None:
+            margin = price - cost_vat           # маржа с НДС
             r.update({'margin': round(margin), 'margin_sum': round(margin * v['qty']),
-                      'mp': round(margin / price_nv * 100) if price_nv else 0})
+                      'mp': round(margin / price * 100) if price else 0})
         rows.append(r)
     rows.sort(key=lambda x: -x['revenue'])
-    return {'rows': rows, 'total_rev': round(sum(r['revenue'] for r in rows) / (1 + vat)),
+    return {'rows': rows, 'total_rev': round(sum(r['revenue'] for r in rows)),
             'total_margin': round(sum(r.get('margin_sum', 0) for r in rows)),
             'covered': sum(1 for r in rows if r['cost'] is not None)}
 
