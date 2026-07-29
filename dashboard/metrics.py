@@ -470,6 +470,21 @@ def _cost_by_sku():
     return d, _n
 
 
+def _recipe_by_sku():
+    """Нормализованное имя SKU → наш рецепт (id, название, себестоимость).
+    Все СТМ-варианты, привязанные к одному рецепту, ведут на одну нашу позицию."""
+    import re
+    from .models import CostItem
+    def _n(s):
+        return re.sub(r'\s*,?\s*шт\.?\s*$', '', str(s or '').strip(), flags=re.I).strip().lower()
+    m = {}
+    for it in CostItem.objects.prefetch_related('skus'):
+        for s in [it.sku] + [x.sku for x in it.skus.all()]:
+            if s:
+                m[_n(s)] = (it.id, it.name, it.cost)
+    return m, _n
+
+
 def _doc_channel_map(ly):
     """doc_no → (client, channel_code) за год."""
     ch_of = dict(Client.objects.values_list('name', 'channel'))
@@ -480,27 +495,36 @@ def _doc_channel_map(ly):
 
 
 def _purchases_margin(docs, vat=0.22):
-    """Маржа по набору документов: SKU × объём × цена × себестоимость × маржа."""
+    """Маржа по набору документов, свёрнуто в НАШИ позиции (рецепты).
+    Все SKU (свой бренд + СТМ), привязанные к одному рецепту, собираются в одну строку."""
     from collections import defaultdict
     from django.db.models import Max
     from .models import SkuDoc
     ly = SkuFact.objects.aggregate(y=Max('year'))['y']
     if not ly or not docs:
         return {'rows': [], 'total_rev': 0, 'total_margin': 0}
-    cost_by, _n = _cost_by_sku()
-    agg = defaultdict(lambda: {'qty': 0, 'amount': 0})
+    rec_by, _n = _recipe_by_sku()
+    # key: ('rec', id) для наших позиций, ('raw', sku) для непривязанных
+    agg = defaultdict(lambda: {'qty': 0, 'amount': 0, 'name': None, 'cost': None})
     for d in SkuDoc.objects.filter(year=ly, doc_no__in=docs).values('sku_raw', 'qty', 'amount'):
-        a = agg[d['sku_raw']]
+        rec = rec_by.get(_n(d['sku_raw']))
+        if rec:
+            key, name, cost = ('rec', rec[0]), rec[1], rec[2]
+        else:
+            key, name, cost = ('raw', d['sku_raw']), d['sku_raw'], None
+        a = agg[key]
         a['qty'] += d['qty']
         a['amount'] += d['amount']
+        a['name'] = name
+        a['cost'] = cost
     rows = []
-    for sku, v in agg.items():
+    for _key, v in agg.items():
         if v['qty'] <= 0:
             continue
-        price = v['amount'] / v['qty']          # цена с НДС
-        cost = cost_by.get(_n(sku))
+        price = v['amount'] / v['qty']          # цена с НДС (средневзвешенная по продажам)
+        cost = v['cost']
         cost_vat = cost * (1 + vat) if cost is not None else None
-        r = {'sku': sku, 'qty': int(v['qty']), 'revenue': round(v['amount']),
+        r = {'sku': v['name'], 'qty': int(v['qty']), 'revenue': round(v['amount']),
              'price': round(price), 'cost': round(cost_vat) if cost_vat is not None else None}
         if cost_vat is not None:
             margin = price - cost_vat           # маржа с НДС
