@@ -175,24 +175,25 @@ def _parse_debt_new(rows, filename):
         return [], [], 0
     facts, lines, total, cur = [], [], 0, None
     for r in rows[hdr + 2:]:
-        a = str(r[0]).strip() if r[0] else ''
-        b = str(r[1]).strip() if len(r) > 1 and r[1] else ''
-        tot = _num(r[4])
+        g = lambda i: r[i] if i < len(r) else None    # безопасный доступ (строки бывают короче)
+        a = str(r[0]).strip() if r and r[0] else ''
+        b = str(g(1)).strip() if g(1) else ''
+        tot = _num(g(4))
         if b and b != 'Итого':                # строка клиента (Покупатель в колонке B)
             cur = b
             if tot:
                 facts.append(dict(client=cur, manager=a, snapshot_date=snap,
-                                  ship_date=_date(r[2]), due_date=_date(r[3]),
-                                  debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
-                                  overdue_days=int(_num(r[6]) or 0)))
+                                  ship_date=_date(g(2)), due_date=_date(g(3)),
+                                  debt_total=int(tot), debt_overdue=int(_num(g(5)) or 0),
+                                  overdue_days=int(_num(g(6)) or 0)))
                 total += int(tot)
         elif a and not b and cur and tot and a != 'Итого':   # любой документ под клиентом
-            bucket = next((nm for idx, nm in _DEBT_BUCKETS if len(r) > idx and _num(r[idx])), '')
+            bucket = next((nm for idx, nm in _DEBT_BUCKETS if _num(g(idx))), '')
             mno = re.search(r'№\s*(\S+)', a)
             lines.append(dict(client=cur, doc_no=(mno.group(1) if mno else ''),
-                              ship_date=_date(r[2]), due_date=_date(r[3]),
-                              debt_total=int(tot), debt_overdue=int(_num(r[5]) or 0),
-                              overdue_days=int(_num(r[6]) or 0), bucket=bucket))
+                              ship_date=_date(g(2)), due_date=_date(g(3)),
+                              debt_total=int(tot), debt_overdue=int(_num(g(5)) or 0),
+                              overdue_days=int(_num(g(6)) or 0), bucket=bucket))
     # дедуп фантомных повторов: строка без номера, дублирующая ту же строку С номером
     # (клиент+отгрузка+срок+сумма) — убираем, чтобы не задваивать график оплат/кошельки
     numbered = {(l['client'], l['ship_date'], l['due_date'], l['debt_total'])
@@ -216,17 +217,18 @@ def _parse_debt_old(rows):
         return [], [], 0
     facts, total = [], 0
     for r in rows[hdr + 1:]:
-        client = r[0]
+        g = lambda i: r[i] if i < len(r) else None
+        client = r[0] if r else None
         if client is None or str(client).strip() in ('', 'Итого'):
             continue
-        tot = _num(r[16])
+        tot = _num(g(16))
         if tot is None:
             continue
         facts.append(dict(client=str(client).strip(),
-                          manager=(str(r[5]).strip() if r[5] else ''),
-                          ship_date=_date(r[11]), due_date=_date(r[13]),
-                          debt_total=int(tot), debt_overdue=int(_num(r[18]) or 0),
-                          overdue_days=int(_num(r[21]) or 0)))
+                          manager=(str(g(5)).strip() if g(5) else ''),
+                          ship_date=_date(g(11)), due_date=_date(g(13)),
+                          debt_total=int(tot), debt_overdue=int(_num(g(18)) or 0),
+                          overdue_days=int(_num(g(21)) or 0)))
         total += int(tot)
     return facts, [], total
 
