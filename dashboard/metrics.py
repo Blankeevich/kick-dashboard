@@ -419,16 +419,19 @@ def cost_margin(vat=0.22):
     """Себестоимость + маржа по позициям: себест (без НДС и с НДС), цена продажи, маржа."""
     from django.db.models import Max
     from .models import CostItem
+    import re
+    def _n(s):   # нормализуем имя SKU: убираем хвост «, шт», регистр, лишние пробелы
+        return re.sub(r'\s*,?\s*шт\.?\s*$', '', str(s or '').strip(), flags=re.I).strip().lower()
     ly = SkuFact.objects.aggregate(y=Max('year'))['y']
     price = {}
     if ly:
         for r in SkuFact.objects.filter(year=ly, qty__gt=0).values('sku_raw').annotate(a=Sum('amount'), q=Sum('qty')):
             if r['q']:
-                price[r['sku_raw']] = r['a'] / r['q']       # цена с НДС
+                price[_n(r['sku_raw'])] = r['a'] / r['q']    # цена с НДС, ключ нормализован
     mapped, unmapped = [], []
     for it in CostItem.objects.all():
         cost_vat = round(it.cost * (1 + vat))
-        p = price.get(it.sku) if it.sku else None
+        p = price.get(_n(it.sku)) if it.sku else None
         row = {'line': it.line, 'name': it.name, 'cost': round(it.cost), 'cost_vat': cost_vat, 'sku': it.sku}
         if p:
             price_nv = p / (1 + vat)                          # цена без НДС

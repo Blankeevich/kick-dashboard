@@ -11,10 +11,15 @@ class CostItemForm(forms.ModelForm):
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
-        skus = sorted(set(SkuFact.objects.values_list('sku_raw', flat=True)))
-        self.fields['sku'] = forms.ChoiceField(
-            required=False, label='SKU для цены продажи',
-            choices=[('', '— не привязано —')] + [(s, s) for s in skus])
+        from django.db.models import Max
+        ly = SkuFact.objects.aggregate(y=Max('year'))['y']
+        skus = sorted(set(SkuFact.objects.filter(year=ly).values_list('sku_raw', flat=True))) if ly else []
+        cur = self.instance.sku if self.instance and self.instance.sku else ''
+        choices = [('', '— не привязано —')] + [(s, s) for s in skus]
+        if cur and cur not in skus:                 # сохранить уже выбранное старое имя
+            choices.append((cur, cur + '  (текущее)'))
+        self.fields['sku'] = forms.ChoiceField(required=False, label='SKU для цены продажи',
+                                               choices=choices)
 
 
 @admin.register(CostItem)
