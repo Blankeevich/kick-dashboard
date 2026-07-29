@@ -8,23 +8,26 @@
   <div class="kpi"><div class="kl">НДС</div><div class="kv sm">+{{ c.vat_pct }}<span class="cur">%</span></div><div class="kf">себест в файле без НДС</div></div>
 </section>
 
-{% if groups %}
 <div class="filters" style="margin:0 0 14px">
   <span class="perlbl">Группа:</span>
-  <a href="?" class="perbtn {% if not sel_group %}on{% endif %}">все позиции</a>
+  <a href="?" class="perbtn {% if not sel_group and not sel_mgr %}on{% endif %}">все позиции</a>
   {% for g in groups %}<a href="?group={{ g.id }}" class="perbtn {% if sel_group.id == g.id %}on{% endif %}">{{ g.name }}</a>{% endfor %}
   <a href="/admin/dashboard/costgroup/" class="clearf">+ группа</a>
+  <span class="perlbl" style="margin-left:12px">Менеджер:</span>
+  <form method="get" style="margin:0"><select name="manager" onchange="this.form.submit()">
+    <option value="">— все —</option>
+    {% for mg in managers %}<option value="{{ mg }}" {% if mg == sel_mgr %}selected{% endif %}>{{ mg }}</option>{% endfor %}
+  </select></form>
 </div>
-{% endif %}
 
 {% if report %}
 <section class="kpis">
-  <div class="kpi hero"><div class="kl">{{ sel_group.name }} · позиций</div><div class="kv">{{ report.rows|length }}</div><div class="kf">по реальным покупкам</div></div>
-  <div class="kpi"><div class="kl">Выручка (без НДС)</div><div class="kv sm">{{ report.total_rev|intcomma }} <span class="cur">₽</span></div><div class="kf">группа</div></div>
+  <div class="kpi hero"><div class="kl">Позиций</div><div class="kv">{{ report.rows|length }}</div><div class="kf">по реальным продажам</div></div>
+  <div class="kpi"><div class="kl">Выручка (без НДС)</div><div class="kv sm">{{ report.total_rev|intcomma }} <span class="cur">₽</span></div><div class="kf">{{ report_label }}</div></div>
   <div class="kpi"><div class="kl">Маржа</div><div class="kv sm">{{ report.total_margin|intcomma }} <span class="cur">₽</span></div><div class="kf">где привязана себест.</div></div>
 </section>
 <div class="card wide">
-  <div class="ch"><span>Что берёт группа «{{ sel_group.name }}»</span><small>реальные покупки контрагентов × себестоимость рецепта</small></div>
+  <div class="ch"><span>Что продаётся — {{ report_label }}</span><small>реальные продажи × себестоимость рецепта</small></div>
   {% if report.rows %}
   <table>
     <thead><tr><th>Позиция (SKU)</th><th>Объём, шт</th><th>Выручка</th><th>Цена/шт</th><th>Себест./шт</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>

@@ -268,10 +268,19 @@ def cost(request):
     except (TypeError, ValueError):
         gid = None
     sel = next((g for g in groups if g.id == gid), None)
-    ctx = {'page': 'cost', 'groups': groups, 'sel_group': sel}
-    if sel and sel.clients.exists():
+    sel_mgr = request.GET.get('manager') or ''
+    managers = metrics.filter_options(CUR_YEAR)['managers']
+    ctx = {'page': 'cost', 'groups': groups, 'sel_group': sel,
+           'managers': managers, 'sel_mgr': sel_mgr}
+    empty = {'mapped': [], 'unmapped': [], 'vat_pct': 22, 'avg_margin': 0}
+    if sel_mgr:
+        ctx['report'] = metrics.manager_report(sel_mgr)
+        ctx['report_label'] = 'менеджер ' + sel_mgr
+        ctx['c'] = empty
+    elif sel and sel.clients.exists():
         ctx['report'] = metrics.group_report(list(sel.clients.values_list('name', flat=True)))
-        ctx['c'] = {'mapped': [], 'unmapped': [], 'vat_pct': 22, 'avg_margin': 0}
+        ctx['report_label'] = 'группа «' + sel.name + '»'
+        ctx['c'] = empty
     else:
         ctx['c'] = metrics.cost_margin(group=sel)
     return render(request, 'dashboard/cost.html', ctx)

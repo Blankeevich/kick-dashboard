@@ -481,17 +481,15 @@ def _doc_channel_map(ly):
     return m
 
 
-def group_report(clients, vat=0.22):
-    """Что берут контрагенты группы: SKU × объём × цена × себестоимость × маржа (по реальным продажам)."""
+def _purchases_margin(docs, vat=0.22):
+    """Маржа по набору документов: SKU × объём × цена × себестоимость × маржа."""
     from collections import defaultdict
     from django.db.models import Max
     from .models import SkuDoc
     ly = SkuFact.objects.aggregate(y=Max('year'))['y']
-    if not ly or not clients:
+    if not ly or not docs:
         return {'rows': [], 'total_rev': 0, 'total_margin': 0}
     cost_by, _n = _cost_by_sku()
-    docs = set(SalesFact.objects.filter(year=ly, client__in=clients)
-               .exclude(doc_no='').values_list('doc_no', flat=True))
     agg = defaultdict(lambda: {'qty': 0, 'amount': 0})
     for d in SkuDoc.objects.filter(year=ly, doc_no__in=docs).values('sku_raw', 'qty', 'amount'):
         a = agg[d['sku_raw']]
@@ -515,6 +513,28 @@ def group_report(clients, vat=0.22):
     return {'rows': rows, 'total_rev': round(sum(r['revenue'] for r in rows) / (1 + vat)),
             'total_margin': round(sum(r.get('margin_sum', 0) for r in rows)),
             'covered': sum(1 for r in rows if r['cost'] is not None)}
+
+
+def group_report(clients, vat=0.22):
+    """Маржа по реальным покупкам контрагентов группы."""
+    from django.db.models import Max
+    ly = SkuFact.objects.aggregate(y=Max('year'))['y']
+    if not ly or not clients:
+        return {'rows': [], 'total_rev': 0, 'total_margin': 0}
+    docs = set(SalesFact.objects.filter(year=ly, client__in=clients)
+               .exclude(doc_no='').values_list('doc_no', flat=True))
+    return _purchases_margin(docs, vat)
+
+
+def manager_report(manager, vat=0.22):
+    """Маржа по реальным продажам менеджера."""
+    from django.db.models import Max
+    ly = SkuFact.objects.aggregate(y=Max('year'))['y']
+    if not ly or not manager:
+        return {'rows': [], 'total_rev': 0, 'total_margin': 0}
+    docs = set(SalesFact.objects.filter(year=ly, manager=manager)
+               .exclude(doc_no='').values_list('doc_no', flat=True))
+    return _purchases_margin(docs, vat)
 
 
 def channel_positions(code, vat=0.22):
