@@ -3,14 +3,14 @@
 {% block content %}
 <section class="kpis">
   <div class="kpi hero"><div class="kl">Позиций с маржой</div><div class="kv">{{ c.mapped|length }}</div><div class="kf">себест из файла + цена продажи</div></div>
-  <div class="kpi"><div class="kl">Средняя маржа</div><div class="kv sm">{{ c.avg_margin }}<span class="cur">%</span></div><div class="kf">без НДС · по позициям</div></div>
+  <div class="kpi"><div class="kl">Средняя маржа</div><div class="kv sm">{{ c.avg_margin }}<span class="cur">%</span></div><div class="kf">без НДС</div></div>
   <div class="kpi"><div class="kl">Не привязано</div><div class="kv sm {% if c.unmapped %}bad{% endif %}">{{ c.unmapped|length }}</div><div class="kf"><a href="{% url 'cost_map' %}" class="link">привязать SKU →</a></div></div>
   <div class="kpi"><div class="kl">НДС</div><div class="kv sm">+{{ c.vat_pct }}<span class="cur">%</span></div><div class="kf">себест в файле без НДС</div></div>
 </section>
 
 {% if cm.channels %}
 <div class="card wide">
-  <div class="ch"><span>Маржа по каналам</span><small>клиент × SKU сшито по документу · канал задаётся в карточке клиента · покрытие себестоимостью {{ cm.covered_pct }}%</small></div>
+  <div class="ch"><span>Маржа по каналам</span><small>клиент × SKU сшито по документу · канал из карточки клиента · клик — что берут</small></div>
   <table>
     <thead><tr><th>Канал</th><th>Выручка (без НДС)</th><th>Маржа ₽</th><th>Маржа %</th><th>Объём, шт</th></tr></thead>
     <tbody>
@@ -23,75 +23,40 @@
       </tr>{% endfor %}
     </tbody>
   </table>
-  <div class="foot">Реальная маржа по каналам: продажи каждого батончика по каждому клиенту (сшивка номенклатуры и контрагентов по № документа) × себестоимость. Раскидай клиентов по каналам в их карточках (сеть/опт/…) — и разбивка станет точной. Маржа считается только там, где привязана себестоимость ({{ cm.covered_pct }}% выручки покрыто).</div>
+  <div class="foot">Настоящая маржа по каналам (не по угадыванию бренда): продажи каждого батончика по каждому клиенту × себестоимость рецепта. Клик по каналу — что именно берут. Маржа считается там, где привязана себестоимость ({{ cm.covered_pct }}% выручки).</div>
 </div>
 {% endif %}
-<section class="grid">
-  <div class="card">
-    <div class="ch"><span>Свой бренд vs СТМ (сети)</span><small>взвешенно по объёму</small></div>
-    <ul class="rows">
-      <li><span class="nm">Свой бренд · маржа</span><span class="vl"><b class="up">{{ c.groups.own_mp }}%</b> · {{ c.groups.own_m|intcomma }} ₽</span></li>
-      <li><span class="nm">Свой бренд · объём</span><span class="vl">{{ c.groups.own_rev|intcomma }} ₽</span></li>
-      <li><span class="nm">СТМ (сети) · маржа</span><span class="vl"><b>{{ c.groups.stm_mp }}%</b> · {{ c.groups.stm_m|intcomma }} ₽</span></li>
-      <li><span class="nm">СТМ (сети) · объём</span><span class="vl">{{ c.groups.stm_rev|intcomma }} ₽</span></li>
-    </ul>
-    <div class="foot">Сколько маржи в рублях приносит свой бренд и сколько — СТМ (сети), с учётом их объёма продаж.</div>
-  </div>
-  <div class="card">
-    <div class="ch"><span>Маржа по брендам</span><small>объём · маржа %</small></div>
-    <table>
-      <thead><tr><th>Бренд</th><th>Объём</th><th>Маржа ₽</th><th>Маржа %</th></tr></thead>
-      <tbody>
-        {% for b in c.by_brand %}<tr>
-          <td>{{ b.brand }}</td><td>{{ b.revenue|intcomma }} ₽</td><td>{{ b.margin|intcomma }} ₽</td>
-          <td><b class="{% if b.mp < 15 %}bad{% elif b.mp >= 40 %}up{% endif %}">{{ b.mp }}%</b></td>
-        </tr>{% endfor %}
-      </tbody>
-    </table>
-  </div>
-</section>
 
 <div class="card wide" style="margin-top:14px">
   <div class="ch"><span>Калькулятор скидок</span><small>какую скидку можно дать при этой себестоимости</small></div>
   <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
     <div class="frow" style="min-width:280px;flex:1"><label>Позиция</label>
-      <select id="dpos" style="font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%"></select>
-    </div>
+      <select id="dpos" style="font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%"></select></div>
     <div class="frow" style="width:150px"><label>Скидка, %</label>
-      <input id="ddisc" type="number" min="0" max="60" step="1" value="10" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%">
-    </div>
+      <input id="ddisc" type="number" min="0" max="60" step="1" value="10" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%"></div>
   </div>
   <div id="dout" style="display:flex;flex-wrap:wrap;gap:20px;margin-top:14px;font-size:13px"></div>
-  <div class="foot">Цена продажи — средняя по SKU (с НДС). Маржа считается без НДС. «Скидка до нуля» — при какой скидке маржа станет 0.</div>
+  <div class="foot">Цена продажи — средняя по SKU (с НДС). Маржа без НДС. «Скидка до нуля» — при какой скидке маржа станет 0.</div>
 </div>
 
 <div class="card wide" style="margin-top:14px">
-  <div class="ch"><span>Маржа по позициям и брендам</span>
-    <span style="font-size:11px;font-weight:400;color:var(--ink2)">
-      бренд:
-      <a href="?" class="perbtn {% if not sel_brand %}on{% endif %}">все</a>
-      {% for b in c.brands %}<a href="?brand={{ b|urlencode }}" class="perbtn {% if sel_brand == b %}on{% endif %}">{{ b }}</a>{% endfor %}
-      · <a href="{% url 'cost_map' %}" class="link">привязать SKU →</a>
-    </span>
-  </div>
-  {% if rows %}
+  <div class="ch"><span>Маржа по позициям</span><small>одна позиция себестоимости — одна строка · худшие сверху · <a href="{% url 'cost_map' %}" class="link">привязать SKU →</a></small></div>
+  {% if c.mapped %}
   <table>
-    <thead><tr><th>Позиция</th><th>Бренд</th><th>Себест. без НДС</th><th>Себест. с НДС</th><th>Цена продажи</th><th>Объём</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>
+    <thead><tr><th>Позиция</th><th>Себест. без НДС</th><th>Себест. с НДС</th><th>Цена продажи</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>
     <tbody>
-      {% for r in rows %}<tr {% if r.mp < 15 %}class="bad"{% endif %}>
+      {% for r in c.mapped %}<tr {% if r.mp < 15 %}class="bad"{% endif %}>
         <td>{{ r.name }}</td>
-        <td><span class="pill">{{ r.brand }}</span></td>
         <td>{{ r.cost|intcomma }} ₽</td>
         <td>{{ r.cost_vat|intcomma }} ₽</td>
         <td>{{ r.price|intcomma }} ₽</td>
-        <td>{{ r.qty|intcomma }} шт</td>
         <td>{{ r.margin|intcomma }} ₽</td>
         <td><b class="{% if r.mp < 15 %}bad{% elif r.mp >= 40 %}up{% endif %}">{{ r.mp }}%</b></td>
       </tr>{% endfor %}
     </tbody>
   </table>
-  <div class="foot">Маржа = цена без НДС − себестоимость без НДС. Красным — ниже 15%. Себест и привязку SKU правишь в «привязать SKU» и в админке.</div>
-  {% else %}<div class="foot">Нет данных. Привяжи SKU к себестоимости.</div>{% endif %}
+  <div class="foot">Цена — по своему бренду (первый привязанный SKU с продажами). Маржа = цена без НДС − себестоимость. Красным — ниже 15%. Разбивку по СТМ/сетям смотри в «Маржа по каналам».</div>
+  {% else %}<div class="foot">Нет привязанных позиций. <a href="{% url 'cost_map' %}" class="link">Привяжи SKU →</a></div>{% endif %}
 </div>
 
 {% if c.unmapped %}
@@ -104,7 +69,7 @@
 </div>
 {% endif %}
 
-<script id="ddata" type="application/json">[{% for r in c.mapped %}{"n":"{{ r.name|escapejs }} · {{ r.brand|escapejs }}","cost":{{ r.cost }},"price":{{ r.price }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
+<script id="ddata" type="application/json">[{% for r in c.mapped %}{"n":"{{ r.name|escapejs }}","cost":{{ r.cost }},"price":{{ r.price }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
 <script>
 (function(){
   var data=JSON.parse(document.getElementById('ddata').textContent||'[]');

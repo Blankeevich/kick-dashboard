@@ -431,72 +431,27 @@ def cost_margin(vat=0.22):
                 price[k] = r['a'] / r['q']    # цена с НДС, ключ нормализован
                 rev[k] = r['a']
                 qty[k] = r['q']
-    def brand(sku):    # короткая метка бренда/канала из имени карточки
-        low = sku.lower()
-        for key, lab in [('самокат', 'Самокат'), ('вкусвилл', 'ВкусВилл'), ('старс', 'Stars'),
-                         ('fancy', 'FANCY'), ('зелен', 'Зелёная линия'), ('ригла', 'Ригла'),
-                         ('dermadrop', 'DERMADROP'), ('true', 'TRUE'), ('армен', 'Армения'),
-                         ('молдов', 'Молдова'), ('дубай', 'Дубай'), ('арабск', 'Арабский')]:
-            if key in low:
-                return lab
-        return 'Свой бренд'
     mapped, unmapped = [], []
     for it in CostItem.objects.prefetch_related('skus'):
         cost_vat = round(it.cost * (1 + vat))
-        skus, seen_n = [], set()          # дедуп по нормализованному имени (свой vs «, шт» — одно)
+        # цена своего бренда: первый привязанный SKU, у которого есть продажи
+        p = None
         for s in [it.sku] + [x.sku for x in it.skus.all()]:
-            if not s:
-                continue
-            k = _n(s)
-            if k in seen_n:
-                continue
-            seen_n.add(k)
-            skus.append(s)
-        matched = False
-        for s in skus:
-            p = price.get(_n(s))
-            if not p:
-                continue
-            matched = True
-            k = _n(s)
+            if s and _n(s) in price:
+                p = price[_n(s)]
+                break
+        if p:
             price_nv = p / (1 + vat)
             margin = price_nv - it.cost
-            revenue_nv = rev.get(k, 0) / (1 + vat)
-            mapped.append({'line': it.line, 'name': it.name, 'sku': s, 'brand': brand(s),
+            mapped.append({'line': it.line, 'name': it.name,
                            'cost': round(it.cost), 'cost_vat': cost_vat, 'price': round(p),
                            'price_nv': round(price_nv), 'margin': round(margin),
-                           'mp': round(margin / price_nv * 100) if price_nv else 0,
-                           'qty': int(qty.get(k, 0)), 'revenue': round(rev.get(k, 0)),
-                           'margin_sum': round(margin * qty.get(k, 0)), 'revenue_nv': round(revenue_nv)})
-        if not matched:
+                           'mp': round(margin / price_nv * 100) if price_nv else 0})
+        else:
             unmapped.append({'line': it.line, 'name': it.name, 'cost': round(it.cost), 'cost_vat': cost_vat})
     mapped.sort(key=lambda r: r['mp'])
-    # сводка по брендам (взвешенно по объёму) + свой vs СТМ
-    from collections import defaultdict
-    bagg = defaultdict(lambda: {'rev_nv': 0, 'margin_sum': 0, 'n': 0})
-    for r in mapped:
-        b = bagg[r['brand']]
-        b['rev_nv'] += r['revenue_nv']
-        b['margin_sum'] += r['margin_sum']
-        b['n'] += 1
-    by_brand = [{'brand': k, 'revenue': v['rev_nv'], 'margin': v['margin_sum'], 'n': v['n'],
-                 'mp': round(v['margin_sum'] / v['rev_nv'] * 100) if v['rev_nv'] else 0}
-                for k, v in bagg.items()]
-    by_brand.sort(key=lambda r: -r['revenue'])
-    own = {'rev': 0, 'm': 0}
-    stm = {'rev': 0, 'm': 0}
-    for r in mapped:
-        t = own if r['brand'] == 'Свой бренд' else stm
-        t['rev'] += r['revenue_nv']
-        t['m'] += r['margin_sum']
-    groups = {'own_rev': own['rev'], 'own_m': own['m'],
-              'own_mp': round(own['m'] / own['rev'] * 100) if own['rev'] else 0,
-              'stm_rev': stm['rev'], 'stm_m': stm['m'],
-              'stm_mp': round(stm['m'] / stm['rev'] * 100) if stm['rev'] else 0}
     return {'mapped': mapped, 'unmapped': unmapped, 'year': ly, 'vat_pct': round(vat * 100),
-            'avg_margin': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0,
-            'by_brand': by_brand, 'groups': groups,
-            'brands': sorted(bagg.keys())}
+            'avg_margin': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0}
 
 
 def _cost_by_sku():
