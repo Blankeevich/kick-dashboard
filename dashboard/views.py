@@ -265,7 +265,7 @@ def cost(request):
     sel_brand = request.GET.get('brand') or ''
     rows = [r for r in c['mapped'] if r['brand'] == sel_brand] if sel_brand else c['mapped']
     return render(request, 'dashboard/cost.html', {'page': 'cost', 'c': c, 'rows': rows,
-                  'sel_brand': sel_brand})
+                  'sel_brand': sel_brand, 'cm': metrics.channel_margin()})
 
 
 @login_required

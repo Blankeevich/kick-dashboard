@@ -51,11 +51,26 @@ class SalesFact(models.Model):
     month = models.IntegerField()
     qty = models.FloatField('Количество', default=0)
     amount = models.BigIntegerField('Сумма с НДС', default=0)
+    doc_no = models.CharField('Номер документа', max_length=60, blank=True, db_index=True)
 
     class Meta:
         verbose_name = 'Продажа'
         verbose_name_plural = 'Продажи (факт из 1С)'
         indexes = [models.Index(fields=['year', 'month']), models.Index(fields=['client'])]
+
+
+class SkuDoc(models.Model):
+    """Строка реализации по номенклатуре с номером документа — для сшивки SKU × контрагент."""
+    upload = models.ForeignKey(Upload, on_delete=models.CASCADE)
+    doc_no = models.CharField('Номер документа', max_length=60, db_index=True)
+    sku_raw = models.CharField('Карточка 1С', max_length=255, db_index=True)
+    year = models.IntegerField(db_index=True)
+    qty = models.FloatField(default=0)
+    amount = models.BigIntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Реализация SKU'
+        verbose_name_plural = 'Реализации по SKU (для сшивки с клиентом)'
 
 
 class SkuFact(models.Model):

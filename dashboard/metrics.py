@@ -499,6 +499,56 @@ def cost_margin(vat=0.22):
             'brands': sorted(bagg.keys())}
 
 
+def channel_margin(vat=0.22):
+    """Маржа в разрезе КАНАЛОВ клиентов: сшиваем номенклатуру×контрагент по номеру документа,
+    берём себестоимость по SKU и канал клиента."""
+    import re
+    from collections import defaultdict
+    from django.db.models import Max
+    from .models import SkuDoc, CostItem
+    def _n(s):
+        return re.sub(r'\s*,?\s*шт\.?\s*$', '', str(s or '').strip(), flags=re.I).strip().lower()
+    ly = SkuFact.objects.aggregate(y=Max('year'))['y']
+    if not ly:
+        return {'channels': [], 'total_rev': 0, 'total_margin': 0, 'covered': 0}
+    # себестоимость по нормализованному имени SKU
+    cost_by = {}
+    for it in CostItem.objects.prefetch_related('skus'):
+        for s in [it.sku] + [x.sku for x in it.skus.all()]:
+            if s:
+                cost_by[_n(s)] = it.cost
+    # документ → канал клиента (за последний год)
+    channel_of = dict(Client.objects.values_list('name', 'channel'))
+    doc2ch = {}
+    for r in SalesFact.objects.filter(year=ly).exclude(doc_no='').values('doc_no', 'client').distinct():
+        doc2ch[r['doc_no']] = channel_of.get(r['client'], 'прочее')
+    # агрегируем по каналам: выручка (без НДС) и маржа
+    agg = defaultdict(lambda: {'rev_nv': 0, 'margin': 0, 'qty': 0})
+    covered_rev = 0
+    for d in SkuDoc.objects.filter(year=ly).values('doc_no', 'sku_raw', 'qty', 'amount'):
+        ch = doc2ch.get(d['doc_no'])
+        if ch is None:
+            continue
+        cost = cost_by.get(_n(d['sku_raw']))
+        rev_nv = d['amount'] / (1 + vat)
+        a = agg[ch]
+        a['rev_nv'] += rev_nv
+        a['qty'] += d['qty']
+        if cost is not None:
+            a['margin'] += rev_nv - cost * d['qty']
+            covered_rev += rev_nv
+    labels = dict(Client.CHANNELS)
+    channels = [{'channel': labels.get(k, k), 'code': k, 'revenue': round(v['rev_nv']),
+                 'margin': round(v['margin']), 'qty': int(v['qty']),
+                 'mp': round(v['margin'] / v['rev_nv'] * 100) if v['rev_nv'] else 0}
+                for k, v in agg.items()]
+    channels.sort(key=lambda r: -r['revenue'])
+    tr = sum(c['revenue'] for c in channels)
+    return {'channels': channels, 'total_rev': tr,
+            'total_margin': round(sum(c['margin'] for c in channels)),
+            'covered_pct': round(covered_rev / tr * 100) if tr else 0}
+
+
 def signals():
     """Сигналы «что требует внимания»: замолчавшие клиенты, рост долга, превышение лимита, падение SKU."""
     from datetime import timedelta

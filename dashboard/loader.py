@@ -9,7 +9,11 @@ from datetime import datetime
 import openpyxl
 from django.db import transaction
 from .models import (Upload, SalesFact, SkuFact, DebtFact, DebtLine,
-                     DebtSnapshot, DebtClientSnapshot, PackagingItem, Client)
+                     DebtSnapshot, DebtClientSnapshot, PackagingItem, Client, SkuDoc)
+
+# типы документов-строк под товаром в отчёте по номенклатуре (не сам товар)
+_SKU_DOC_PREFIXES = ('Реализация', 'Корректировка', 'Отчет комисс', 'Отчёт комисс',
+                     'Возврат', 'Списание', 'Операция')
 
 MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 STM = ['вкусвилл', 'самокат', 'старс', 'fancy', 'butman', 'зеленая линия', 'зелёная линия',
@@ -110,12 +114,14 @@ def load_sales_client(fileobj, filename, user=None):
         s = str(doc).strip()
         dt = ('Реализация' if s.startswith('Реализа') else 'Корректировка' if s.startswith('Корректировк')
               else 'Комиссионер' if s.startswith('Отчет комисс') else 'Прочее')
+        mno = re.search(r'№\s*(\S+)', s)
+        dno = mno.group(1) if mno else ''
         for mnum, col in cols.items():
             amt = _num(r[col + 1])
             qty = _num(r[col])
             if amt is None and qty is None:
                 continue
-            facts.append(SalesFact(upload=up, doc_type=dt, doc_date=_date(r[1]),
+            facts.append(SalesFact(upload=up, doc_type=dt, doc_date=_date(r[1]), doc_no=dno,
                                    client=str(r[2]).strip(), manager=(str(r[3]).strip() if r[3] else ''),
                                    year=year, month=mnum, qty=qty or 0, amount=int(amt or 0)))
             total += int(amt or 0)
@@ -136,22 +142,36 @@ def load_sales_sku(fileobj, filename, user=None):
     up = Upload.objects.create(kind='sales_sku', filename=filename, file_hash=h,
                                period_year=year, uploaded_by=user)
     SkuFact.objects.filter(year=year).delete()
-    facts, total = [], 0
+    SkuDoc.objects.filter(year=year).delete()
+    facts, docs, total, cur_sku = [], [], 0, None
     for r in rows[2:]:
         name = r[0]
         if name is None or str(name).strip() in ('', 'Итого'):
             continue
         name = str(name).strip()
-        bt = _classify(name)
-        for mnum, col in cols.items():
-            amt = _num(r[col + 1])
-            qty = _num(r[col])
-            if amt is None and qty is None:
+        is_doc = name.startswith(_SKU_DOC_PREFIXES)
+        if not is_doc:
+            cur_sku = name                       # строка-товар = родитель
+            bt = _classify(name)
+            for mnum, col in cols.items():
+                amt = _num(r[col + 1])
+                qty = _num(r[col])
+                if amt is None and qty is None:
+                    continue
+                facts.append(SkuFact(upload=up, sku_raw=name, brand_type=bt, year=year,
+                                     month=mnum, qty=qty or 0, amount=int(amt or 0)))
+                total += int(amt or 0)
+        elif cur_sku:                             # строка-реализация под товаром → сшивка
+            mno = re.search(r'№\s*(\S+)', name)
+            if not mno:
                 continue
-            facts.append(SkuFact(upload=up, sku_raw=name, brand_type=bt, year=year,
-                                 month=mnum, qty=qty or 0, amount=int(amt or 0)))
-            total += int(amt or 0)
+            q = sum(_num(r[c]) or 0 for c in cols.values())
+            a = sum(_num(r[c + 1]) or 0 for c in cols.values())
+            if a or q:
+                docs.append(SkuDoc(upload=up, doc_no=mno.group(1), sku_raw=cur_sku,
+                                   year=year, qty=q, amount=int(a)))
     SkuFact.objects.bulk_create(facts, batch_size=1000)
+    SkuDoc.objects.bulk_create(docs, batch_size=1000)
     up.rows_loaded = len(facts)
     up.control_sum = total
     up.save()
