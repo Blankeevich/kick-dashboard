@@ -415,8 +415,9 @@ def rfm():
             'rows': data, 'total_clients': len(data)}
 
 
-def cost_margin(vat=0.22):
-    """Себестоимость + маржа по позициям: себест (без НДС и с НДС), цена продажи, маржа."""
+def cost_margin(vat=0.22, group=None):
+    """Себестоимость + маржа по позициям: себест (без НДС и с НДС), цена продажи, маржа.
+    group — фильтр по своей группе позиций (CostGroup)."""
     from django.db.models import Max
     from .models import CostItem
     import re
@@ -432,7 +433,10 @@ def cost_margin(vat=0.22):
                 rev[k] = r['a']
                 qty[k] = r['q']
     mapped, unmapped = [], []
-    for it in CostItem.objects.prefetch_related('skus'):
+    items = CostItem.objects.prefetch_related('skus')
+    if group is not None:
+        items = items.filter(groups=group)
+    for it in items:
         cost_vat = round(it.cost * (1 + vat))
         # цена своего бренда: первый привязанный SKU, у которого есть продажи
         p = None

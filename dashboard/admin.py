@@ -1,7 +1,14 @@
 from django import forms
 from django.contrib import admin
 from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
-                     SalesFact, DebtSnapshot, ManagerProfile, CostItem, CostSku, SkuFact)
+                     SalesFact, DebtSnapshot, ManagerProfile, CostItem, CostSku, SkuFact, CostGroup)
+
+
+@admin.register(CostGroup)
+class CostGroupAdmin(admin.ModelAdmin):
+    list_display = ('name', 'order')
+    list_editable = ('order',)
+    filter_horizontal = ('items',)
 
 
 def _sku_choices(current=''):

@@ -261,8 +261,15 @@ def rfm(request):
 
 @login_required
 def cost(request):
-    return render(request, 'dashboard/cost.html', {'page': 'cost', 'c': metrics.cost_margin(),
-                  'cm': metrics.channel_margin()})
+    from .models import CostGroup
+    groups = list(CostGroup.objects.all())
+    try:
+        gid = int(request.GET.get('group'))
+    except (TypeError, ValueError):
+        gid = None
+    sel = next((g for g in groups if g.id == gid), None)
+    return render(request, 'dashboard/cost.html', {'page': 'cost',
+                  'c': metrics.cost_margin(group=sel), 'groups': groups, 'sel_group': sel})
 
 
 @login_required

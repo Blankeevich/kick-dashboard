@@ -8,25 +8,6 @@
   <div class="kpi"><div class="kl">НДС</div><div class="kv sm">+{{ c.vat_pct }}<span class="cur">%</span></div><div class="kf">себест в файле без НДС</div></div>
 </section>
 
-{% if cm.channels %}
-<div class="card wide">
-  <div class="ch"><span>Маржа по каналам</span><small>клиент × SKU сшито по документу · канал из карточки клиента · клик — что берут</small></div>
-  <table>
-    <thead><tr><th>Канал</th><th>Выручка (без НДС)</th><th>Маржа ₽</th><th>Маржа %</th><th>Объём, шт</th></tr></thead>
-    <tbody>
-      {% for ch in cm.channels %}<tr onclick="location.href='{% url 'cost_channel' ch.code %}'" style="cursor:pointer">
-        <td><b>{{ ch.channel }}</b> <span style="color:var(--ink2);font-size:11px">→</span></td>
-        <td>{{ ch.revenue|intcomma }} ₽</td>
-        <td>{{ ch.margin|intcomma }} ₽</td>
-        <td><b class="{% if ch.mp < 15 %}bad{% elif ch.mp >= 40 %}up{% endif %}">{{ ch.mp }}%</b></td>
-        <td>{{ ch.qty|intcomma }}</td>
-      </tr>{% endfor %}
-    </tbody>
-  </table>
-  <div class="foot">Настоящая маржа по каналам (не по угадыванию бренда): продажи каждого батончика по каждому клиенту × себестоимость рецепта. Клик по каналу — что именно берут. Маржа считается там, где привязана себестоимость ({{ cm.covered_pct }}% выручки).</div>
-</div>
-{% endif %}
-
 <div class="card wide" style="margin-top:14px">
   <div class="ch"><span>Калькулятор скидок</span><small>какую скидку можно дать при этой себестоимости</small></div>
   <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
@@ -40,7 +21,14 @@
 </div>
 
 <div class="card wide" style="margin-top:14px">
-  <div class="ch"><span>Маржа по позициям</span><small>одна позиция себестоимости — одна строка · худшие сверху · <a href="{% url 'cost_map' %}" class="link">привязать SKU →</a></small></div>
+  <div class="ch"><span>Маржа по позициям{% if sel_group %}: {{ sel_group.name }}{% endif %}</span>
+    <span style="font-size:11px;font-weight:400;color:var(--ink2)">
+      группа:
+      <a href="?" class="perbtn {% if not sel_group %}on{% endif %}">все</a>
+      {% for g in groups %}<a href="?group={{ g.id }}" class="perbtn {% if sel_group.id == g.id %}on{% endif %}">{{ g.name }}</a>{% endfor %}
+      · <a href="/admin/dashboard/costgroup/" class="link">+ группа</a>
+    </span>
+  </div>
   {% if c.mapped %}
   <table>
     <thead><tr><th>Позиция</th><th>Себест. без НДС</th><th>Себест. с НДС</th><th>Цена продажи</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>

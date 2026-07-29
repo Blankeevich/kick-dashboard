@@ -258,6 +258,22 @@ class CostItem(models.Model):
         return self.name
 
 
+class CostGroup(models.Model):
+    """Своя группа позиций себестоимости (например «Перекрёсток», «Сети») — ведётся вручную."""
+    name = models.CharField('Название группы', max_length=120, unique=True)
+    items = models.ManyToManyField('CostItem', blank=True, related_name='groups',
+                                   verbose_name='Позиции себестоимости в группе')
+    order = models.IntegerField('Порядок', default=0)
+
+    class Meta:
+        verbose_name = 'Группа себестоимости'
+        verbose_name_plural = 'Группы себестоимости (свои)'
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
 class CostSku(models.Model):
     """Доп. SKU для позиции себестоимости: один рецепт — несколько брендов (свой + СТМ)."""
     cost = models.ForeignKey(CostItem, on_delete=models.CASCADE, related_name='skus',
