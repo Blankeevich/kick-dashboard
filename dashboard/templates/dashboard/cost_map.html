@@ -8,9 +8,10 @@
 <h2 style="margin:0 0 4px;font-size:22px">Привязка SKU к себестоимости</h2>
 <div class="foot" style="margin:0 0 14px">Один рецепт — несколько SKU (свой бренд + СТМ под клиентов). Привязано позиций: {{ mapped }} из {{ total }}.</div>
 
+<datalist id="skulist">{% for s in skus %}<option value="{{ s }}"></option>{% endfor %}</datalist>
 <div class="card wide">
-  <table>
-    <thead><tr><th>Позиция (себестоимость)</th><th>Привязанные SKU</th><th style="width:320px">Добавить SKU</th></tr></thead>
+  <table style="table-layout:fixed;width:100%">
+    <thead><tr><th style="width:30%">Позиция (себестоимость)</th><th style="width:34%">Привязанные SKU</th><th style="width:36%">Добавить SKU</th></tr></thead>
     <tbody>
       {% for it in items %}<tr id="c{{ it.id }}">
         <td><b>{{ it.name }}</b><br><span style="color:var(--ink2);font-size:11px">{{ it.line }} · себест {{ it.cost }} ₽</span></td>
@@ -28,10 +29,8 @@
           <form method="post" style="display:flex;gap:6px">{% csrf_token %}
             <input type="hidden" name="cost" value="{{ it.id }}">
             <input type="hidden" name="action" value="add">
-            <select name="sku" style="flex:1;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;max-width:250px">
-              <option value="">выбрать SKU…</option>
-              {% for s in skus %}<option value="{{ s }}">{{ s|truncatechars:48 }}</option>{% endfor %}
-            </select>
+            <input name="sku" list="skulist" autocomplete="off" placeholder="вводи название SKU…"
+                   style="flex:1;min-width:0;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:7px 9px">
             <button type="submit" class="btn" style="padding:6px 12px">+</button>
           </form>
         </td>

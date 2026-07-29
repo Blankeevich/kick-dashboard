@@ -289,7 +289,9 @@ def cost_map(request):
         cid = request.POST.get('cost')
         act = request.POST.get('action')
         if act == 'add' and request.POST.get('sku'):
-            CostSku.objects.get_or_create(cost_id=cid, sku=request.POST['sku'])
+            sku = request.POST['sku'].strip()
+            if SkuFact.objects.filter(sku_raw=sku).exists():   # только реальный SKU
+                CostSku.objects.get_or_create(cost_id=cid, sku=sku)
         elif act == 'remove_extra':
             CostSku.objects.filter(id=request.POST.get('csid')).delete()
         elif act == 'remove_primary':
