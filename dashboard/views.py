@@ -269,6 +269,12 @@ def cost(request):
 
 
 @login_required
+def cost_channel(request, code):
+    return render(request, 'dashboard/cost_channel.html',
+                  {'page': 'cost', 'ch': metrics.channel_positions(code)})
+
+
+@login_required
 def cost_map(request):
     from django.db.models import Max
     from django.shortcuts import redirect

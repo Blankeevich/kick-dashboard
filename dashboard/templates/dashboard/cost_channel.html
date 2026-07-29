@@ -1,0 +1,30 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Канал: {{ ch.label }}{% endblock %}
+{% block content %}
+<div style="margin-bottom:12px"><a href="{% url 'cost' %}" class="link">← к марже</a></div>
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">Канал: {{ ch.label }}</div><div class="kv sm" style="font-size:20px">{{ ch.rows|length }}</div><div class="kf">позиций берут</div></div>
+  <div class="kpi"><div class="kl">Выручка (без НДС)</div><div class="kv sm">{{ ch.total_rev|intcomma }} <span class="cur">₽</span></div><div class="kf">по каналу</div></div>
+  <div class="kpi"><div class="kl">Маржа</div><div class="kv sm">{{ ch.total_margin|intcomma }} <span class="cur">₽</span></div><div class="kf">где привязана себест.</div></div>
+</section>
+<div class="card wide">
+  <div class="ch"><span>Что берёт канал «{{ ch.label }}»</span><small>по продажам · себестоимость по привязке SKU</small></div>
+  {% if ch.rows %}
+  <table>
+    <thead><tr><th>Позиция (SKU)</th><th>Объём, шт</th><th>Выручка</th><th>Цена/шт</th><th>Себест./шт</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>
+    <tbody>
+      {% for r in ch.rows %}<tr {% if r.mp != None and r.mp < 15 %}class="bad"{% endif %}>
+        <td>{{ r.sku }}</td>
+        <td>{{ r.qty|intcomma }}</td>
+        <td>{{ r.revenue|intcomma }} ₽</td>
+        <td>{{ r.price|intcomma }} ₽</td>
+        <td>{% if r.cost != None %}{{ r.cost|intcomma }} ₽{% else %}<span style="color:var(--ink2)">нет</span>{% endif %}</td>
+        <td>{% if r.margin != None %}{{ r.margin|intcomma }} ₽{% else %}—{% endif %}</td>
+        <td>{% if r.mp != None %}<b class="{% if r.mp < 15 %}bad{% elif r.mp >= 40 %}up{% endif %}">{{ r.mp }}%</b>{% else %}—{% endif %}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="foot">Позиции, которые берёт этот канал, с ценой и маржой. «Себест. нет» — SKU ещё не привязан к себестоимости (<a href="{% url 'cost_map' %}" class="link">привязать</a>). Канал у клиента задаётся в его карточке.</div>
+  {% else %}<div class="foot">Нет продаж по этому каналу, или клиенты канала не размечены. Разметь клиентов по каналам в их карточках.</div>{% endif %}
+</div>
+{% endblock %}

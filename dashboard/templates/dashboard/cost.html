@@ -14,8 +14,8 @@
   <table>
     <thead><tr><th>Канал</th><th>Выручка (без НДС)</th><th>Маржа ₽</th><th>Маржа %</th><th>Объём, шт</th></tr></thead>
     <tbody>
-      {% for ch in cm.channels %}<tr>
-        <td><b>{{ ch.channel }}</b></td>
+      {% for ch in cm.channels %}<tr onclick="location.href='{% url 'cost_channel' ch.code %}'" style="cursor:pointer">
+        <td><b>{{ ch.channel }}</b> <span style="color:var(--ink2);font-size:11px">→</span></td>
         <td>{{ ch.revenue|intcomma }} ₽</td>
         <td>{{ ch.margin|intcomma }} ₽</td>
         <td><b class="{% if ch.mp < 15 %}bad{% elif ch.mp >= 40 %}up{% endif %}">{{ ch.mp }}%</b></td>

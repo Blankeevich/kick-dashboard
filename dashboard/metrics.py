@@ -499,6 +499,68 @@ def cost_margin(vat=0.22):
             'brands': sorted(bagg.keys())}
 
 
+def _cost_by_sku():
+    """Себестоимость по нормализованному имени SKU (свой + привязанные СТМ)."""
+    import re
+    from .models import CostItem
+    def _n(s):
+        return re.sub(r'\s*,?\s*шт\.?\s*$', '', str(s or '').strip(), flags=re.I).strip().lower()
+    d = {}
+    for it in CostItem.objects.prefetch_related('skus'):
+        for s in [it.sku] + [x.sku for x in it.skus.all()]:
+            if s:
+                d[_n(s)] = it.cost
+    return d, _n
+
+
+def _doc_channel_map(ly):
+    """doc_no → (client, channel_code) за год."""
+    ch_of = dict(Client.objects.values_list('name', 'channel'))
+    m = {}
+    for r in SalesFact.objects.filter(year=ly).exclude(doc_no='').values('doc_no', 'client').distinct():
+        m[r['doc_no']] = (r['client'], ch_of.get(r['client'], 'прочее'))
+    return m
+
+
+def channel_positions(code, vat=0.22):
+    """Что берёт канал: позиции (SKU) с объёмом, ценой, себестоимостью и маржой."""
+    from collections import defaultdict
+    from django.db.models import Max
+    from .models import SkuDoc
+    ly = SkuFact.objects.aggregate(y=Max('year'))['y']
+    if not ly:
+        return {'rows': [], 'label': code}
+    cost_by, _n = _cost_by_sku()
+    doc2 = _doc_channel_map(ly)
+    agg = defaultdict(lambda: {'qty': 0, 'amount': 0})
+    for d in SkuDoc.objects.filter(year=ly).values('doc_no', 'sku_raw', 'qty', 'amount'):
+        cc = doc2.get(d['doc_no'])
+        if not cc or cc[1] != code:
+            continue
+        a = agg[d['sku_raw']]
+        a['qty'] += d['qty']
+        a['amount'] += d['amount']
+    rows = []
+    for sku, v in agg.items():
+        if v['qty'] <= 0:
+            continue
+        price = v['amount'] / v['qty']
+        price_nv = price / (1 + vat)
+        cost = cost_by.get(_n(sku))
+        r = {'sku': sku, 'qty': int(v['qty']), 'revenue': round(v['amount']),
+             'price': round(price), 'cost': round(cost) if cost is not None else None}
+        if cost is not None:
+            margin = price_nv - cost
+            r.update({'margin': round(margin), 'margin_sum': round(margin * v['qty']),
+                      'mp': round(margin / price_nv * 100) if price_nv else 0})
+        rows.append(r)
+    rows.sort(key=lambda x: -x['revenue'])
+    label = dict(Client.CHANNELS).get(code, code)
+    return {'rows': rows, 'label': label, 'code': code,
+            'total_rev': round(sum(r['revenue'] for r in rows) / (1 + vat)),
+            'total_margin': round(sum(r.get('margin_sum', 0) for r in rows))}
+
+
 def channel_margin(vat=0.22):
     """Маржа в разрезе КАНАЛОВ клиентов: сшиваем номенклатуру×контрагент по номеру документа,
     берём себестоимость по SKU и канал клиента."""

@@ -13,6 +13,7 @@ urlpatterns = [
     path('signals/', views.signals, name='signals'),
     path('cost/', views.cost, name='cost'),
     path('cost/map/', views.cost_map, name='cost_map'),
+    path('cost/channel/<code>/', views.cost_channel, name='cost_channel'),
     path('rfm/', views.rfm, name='rfm'),
     path('export/', views.export_xlsx, name='export'),
     path('managers/', views.managers, name='managers'),
