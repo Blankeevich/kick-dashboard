@@ -508,8 +508,11 @@ def _purchases_margin(docs, vat=0.22):
                       'mp': round(margin / price * 100) if price else 0})
         rows.append(r)
     rows.sort(key=lambda x: -x['revenue'])
+    total_margin = round(sum(r.get('margin_sum', 0) for r in rows))
+    covered_rev = sum(r['revenue'] for r in rows if r['cost'] is not None)
     return {'rows': rows, 'total_rev': round(sum(r['revenue'] for r in rows)),
-            'total_margin': round(sum(r.get('margin_sum', 0) for r in rows)),
+            'total_margin': total_margin,
+            'avg_mp': round(total_margin / covered_rev * 100) if covered_rev else 0,
             'covered': sum(1 for r in rows if r['cost'] is not None)}
 
 

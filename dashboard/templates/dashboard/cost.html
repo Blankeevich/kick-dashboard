@@ -24,16 +24,17 @@
 {% if report %}
 <section class="kpis">
   <div class="kpi hero"><div class="kl">Позиций</div><div class="kv">{{ report.rows|length }}</div><div class="kf">по реальным продажам</div></div>
+  <div class="kpi"><div class="kl">Средняя маржа</div><div class="kv sm">{{ report.avg_mp }}<span class="cur">%</span></div><div class="kf">по списку · где привязана себест.</div></div>
   <div class="kpi"><div class="kl">Выручка (с НДС)</div><div class="kv sm">{{ report.total_rev|intcomma }} <span class="cur">₽</span></div><div class="kf">{{ report_label }}</div></div>
   <div class="kpi"><div class="kl">Маржа (с НДС)</div><div class="kv sm">{{ report.total_margin|intcomma }} <span class="cur">₽</span></div><div class="kf">где привязана себест.</div></div>
 </section>
 <div class="card wide">
-  <div class="ch"><span>Что продаётся — {{ report_label }}</span><small>всё с НДС · себестоимость рецепта +22%</small></div>
+  <div class="ch"><span>Что продаётся — {{ report_label }}</span><small>всё с НДС · себестоимость рецепта +22% · <a href="#" id="tglnocost" class="link">скрыть без себестоимости</a></small></div>
   {% if report.rows %}
-  <table>
+  <table id="rtbl">
     <thead><tr><th>Позиция (SKU)</th><th>Объём, шт</th><th>Выручка</th><th>Цена/шт</th><th>Себест./шт</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>
     <tbody>
-      {% for r in report.rows %}<tr {% if r.mp != None and r.mp < 15 %}class="bad"{% endif %}>
+      {% for r in report.rows %}<tr class="{% if r.mp != None and r.mp < 15 %}bad {% endif %}{% if r.cost == None %}nocost{% endif %}">
         <td>{{ r.sku }}</td><td>{{ r.qty|intcomma }}</td><td>{{ r.revenue|intcomma }} ₽</td>
         <td>{{ r.price|intcomma }} ₽</td>
         <td>{% if r.cost != None %}{{ r.cost|intcomma }} ₽{% else %}<span style="color:var(--ink2)">нет</span>{% endif %}</td>
@@ -108,6 +109,17 @@
       '<div><div style="color:var(--ink2)">Скидка до нуля маржи</div><b style="font-size:18px" class="'+(k>=zero?'bad':'')+'">'+zero+'%</b></div>';
   }
   pos.addEventListener('change',calc); disc.addEventListener('input',calc); calc();
+})();
+(function(){
+  var tgl=document.getElementById('tglnocost'), tbl=document.getElementById('rtbl');
+  if(!tgl||!tbl){return;}
+  var hidden=localStorage.getItem('kick_hide_nocost')==='1';
+  function apply(){
+    tbl.querySelectorAll('tr.nocost').forEach(function(r){r.style.display=hidden?'none':'';});
+    tgl.textContent=hidden?'показать без себестоимости':'скрыть без себестоимости';
+  }
+  tgl.addEventListener('click',function(e){e.preventDefault();hidden=!hidden;localStorage.setItem('kick_hide_nocost',hidden?'1':'0');apply();});
+  apply();
 })();
 </script>
 {% endblock %}
