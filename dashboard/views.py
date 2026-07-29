@@ -271,7 +271,9 @@ def cost(request):
     sel_mgr = request.GET.get('manager') or ''
     managers = metrics.filter_options(CUR_YEAR)['managers']
     ctx = {'page': 'cost', 'groups': groups, 'sel_group': sel,
-           'managers': managers, 'sel_mgr': sel_mgr}
+           'managers': managers, 'sel_mgr': sel_mgr,
+           'last_sales': Upload.objects.filter(kind='sales_client').order_by('-uploaded_at').first(),
+           'last_debt': Upload.objects.filter(kind='debt').order_by('-uploaded_at').first()}
     empty = {'mapped': [], 'unmapped': [], 'vat_pct': 22, 'avg_margin': 0}
     if sel_mgr:
         ctx['report'] = metrics.manager_report(sel_mgr)
