@@ -265,6 +265,37 @@ def cost(request):
 
 
 @login_required
+def cost_map(request):
+    from django.db.models import Max
+    from django.shortcuts import redirect
+    from .models import CostItem, CostSku, SkuFact
+    if not request.user.is_staff:
+        return render(request, 'dashboard/cost_map.html', {'page': 'cost', 'no_access': True})
+    if request.method == 'POST':
+        cid = request.POST.get('cost')
+        act = request.POST.get('action')
+        if act == 'add' and request.POST.get('sku'):
+            CostSku.objects.get_or_create(cost_id=cid, sku=request.POST['sku'])
+        elif act == 'remove_extra':
+            CostSku.objects.filter(id=request.POST.get('csid')).delete()
+        elif act == 'remove_primary':
+            CostItem.objects.filter(id=cid).update(sku='')
+        return redirect(f"{request.path}#c{cid}")
+    ly = SkuFact.objects.aggregate(y=Max('year'))['y']
+    skus = sorted(set(SkuFact.objects.filter(year=ly).values_list('sku_raw', flat=True))) if ly else []
+    items = []
+    for it in CostItem.objects.prefetch_related('skus').order_by('line', 'name'):
+        att = []
+        if it.sku:
+            att.append({'label': it.sku, 'primary': True})
+        for x in it.skus.all():
+            att.append({'label': x.sku, 'primary': False, 'csid': x.id})
+        items.append({'id': it.id, 'name': it.name, 'line': it.line, 'cost': round(it.cost), 'att': att})
+    return render(request, 'dashboard/cost_map.html', {'page': 'cost', 'items': items, 'skus': skus,
+                  'mapped': sum(1 for i in items if i['att']), 'total': len(items)})
+
+
+@login_required
 def signals(request):
     return render(request, 'dashboard/signals.html',
                   {'page': 'signals', 's': metrics.signals(), 'cur_year': CUR_YEAR})

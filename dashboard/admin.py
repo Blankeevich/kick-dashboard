@@ -1,7 +1,17 @@
 from django import forms
 from django.contrib import admin
 from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
-                     SalesFact, DebtSnapshot, ManagerProfile, CostItem, SkuFact)
+                     SalesFact, DebtSnapshot, ManagerProfile, CostItem, CostSku, SkuFact)
+
+
+def _sku_choices(current=''):
+    from django.db.models import Max
+    ly = SkuFact.objects.aggregate(y=Max('year'))['y']
+    skus = sorted(set(SkuFact.objects.filter(year=ly).values_list('sku_raw', flat=True))) if ly else []
+    ch = [('', '— выбрать SKU —')] + [(s, s) for s in skus]
+    if current and current not in skus:
+        ch.append((current, current + '  (текущее)'))
+    return ch
 
 
 class CostItemForm(forms.ModelForm):
@@ -11,20 +21,34 @@ class CostItemForm(forms.ModelForm):
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
-        from django.db.models import Max
-        ly = SkuFact.objects.aggregate(y=Max('year'))['y']
-        skus = sorted(set(SkuFact.objects.filter(year=ly).values_list('sku_raw', flat=True))) if ly else []
         cur = self.instance.sku if self.instance and self.instance.sku else ''
-        choices = [('', '— не привязано —')] + [(s, s) for s in skus]
-        if cur and cur not in skus:                 # сохранить уже выбранное старое имя
-            choices.append((cur, cur + '  (текущее)'))
-        self.fields['sku'] = forms.ChoiceField(required=False, label='SKU для цены продажи',
-                                               choices=choices)
+        self.fields['sku'] = forms.ChoiceField(required=False, label='Основной SKU (свой бренд)',
+                                               choices=_sku_choices(cur))
+
+
+class CostSkuForm(forms.ModelForm):
+    class Meta:
+        model = CostSku
+        fields = '__all__'
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        cur = self.instance.sku if self.instance and self.instance.sku else ''
+        self.fields['sku'] = forms.ChoiceField(required=False, choices=_sku_choices(cur))
+
+
+class CostSkuInline(admin.TabularInline):
+    model = CostSku
+    form = CostSkuForm
+    extra = 1
+    verbose_name = 'СТМ / доп. SKU'
+    verbose_name_plural = 'Ещё SKU этого рецепта (СТМ, другие бренды)'
 
 
 @admin.register(CostItem)
 class CostItemAdmin(admin.ModelAdmin):
     form = CostItemForm
+    inlines = [CostSkuInline]
     list_display = ('name', 'line', 'cost', 'sku', 'updated_at')
     list_filter = ('line',)
     search_fields = ('name', 'sku')

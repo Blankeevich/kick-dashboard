@@ -428,19 +428,33 @@ def cost_margin(vat=0.22):
         for r in SkuFact.objects.filter(year=ly, qty__gt=0).values('sku_raw').annotate(a=Sum('amount'), q=Sum('qty')):
             if r['q']:
                 price[_n(r['sku_raw'])] = r['a'] / r['q']    # цена с НДС, ключ нормализован
+    def brand(sku):    # короткая метка бренда/канала из имени карточки
+        low = sku.lower()
+        for key, lab in [('самокат', 'Самокат'), ('вкусвилл', 'ВкусВилл'), ('старс', 'Stars'),
+                         ('fancy', 'FANCY'), ('зелен', 'Зелёная линия'), ('ригла', 'Ригла'),
+                         ('dermadrop', 'DERMADROP'), ('true', 'TRUE'), ('армен', 'Армения'),
+                         ('молдов', 'Молдова'), ('дубай', 'Дубай'), ('арабск', 'Арабский')]:
+            if key in low:
+                return lab
+        return 'Свой бренд'
     mapped, unmapped = [], []
-    for it in CostItem.objects.all():
+    for it in CostItem.objects.prefetch_related('skus'):
         cost_vat = round(it.cost * (1 + vat))
-        p = price.get(_n(it.sku)) if it.sku else None
-        row = {'line': it.line, 'name': it.name, 'cost': round(it.cost), 'cost_vat': cost_vat, 'sku': it.sku}
-        if p:
-            price_nv = p / (1 + vat)                          # цена без НДС
+        skus = list(dict.fromkeys([s for s in ([it.sku] + [x.sku for x in it.skus.all()]) if s]))
+        matched = False
+        for s in skus:
+            p = price.get(_n(s))
+            if not p:
+                continue
+            matched = True
+            price_nv = p / (1 + vat)
             margin = price_nv - it.cost
-            row.update({'price': round(p), 'price_nv': round(price_nv), 'margin': round(margin),
-                        'mp': round(margin / price_nv * 100) if price_nv else 0})
-            mapped.append(row)
-        else:
-            unmapped.append(row)
+            mapped.append({'line': it.line, 'name': it.name, 'sku': s, 'brand': brand(s),
+                           'cost': round(it.cost), 'cost_vat': cost_vat, 'price': round(p),
+                           'price_nv': round(price_nv), 'margin': round(margin),
+                           'mp': round(margin / price_nv * 100) if price_nv else 0})
+        if not matched:
+            unmapped.append({'line': it.line, 'name': it.name, 'cost': round(it.cost), 'cost_vat': cost_vat})
     mapped.sort(key=lambda r: r['mp'])
     return {'mapped': mapped, 'unmapped': unmapped, 'year': ly, 'vat_pct': round(vat * 100),
             'avg_margin': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0}

@@ -1,0 +1,44 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Привязка себестоимости{% endblock %}
+{% block content %}
+{% if no_access %}
+<div class="card"><div class="foot" style="margin-top:0">Привязка доступна только администраторам.</div></div>
+{% else %}
+<div style="margin-bottom:12px"><a href="{% url 'cost' %}" class="link">← к марже</a></div>
+<h2 style="margin:0 0 4px;font-size:22px">Привязка SKU к себестоимости</h2>
+<div class="foot" style="margin:0 0 14px">Один рецепт — несколько SKU (свой бренд + СТМ под клиентов). Привязано позиций: {{ mapped }} из {{ total }}.</div>
+
+<div class="card wide">
+  <table>
+    <thead><tr><th>Позиция (себестоимость)</th><th>Привязанные SKU</th><th style="width:320px">Добавить SKU</th></tr></thead>
+    <tbody>
+      {% for it in items %}<tr id="c{{ it.id }}">
+        <td><b>{{ it.name }}</b><br><span style="color:var(--ink2);font-size:11px">{{ it.line }} · себест {{ it.cost }} ₽</span></td>
+        <td>
+          {% for a in it.att %}
+          <form method="post" style="display:inline-block;margin:0 4px 4px 0">{% csrf_token %}
+            <input type="hidden" name="cost" value="{{ it.id }}">
+            <input type="hidden" name="action" value="{% if a.primary %}remove_primary{% else %}remove_extra{% endif %}">
+            {% if not a.primary %}<input type="hidden" name="csid" value="{{ a.csid }}">{% endif %}
+            <button type="submit" class="pill" style="border:1px solid var(--line);cursor:pointer" title="убрать">{{ a.label|truncatechars:40 }} ✕</button>
+          </form>
+          {% empty %}<span style="color:var(--ink2)">— пусто —</span>{% endfor %}
+        </td>
+        <td>
+          <form method="post" style="display:flex;gap:6px">{% csrf_token %}
+            <input type="hidden" name="cost" value="{{ it.id }}">
+            <input type="hidden" name="action" value="add">
+            <select name="sku" style="flex:1;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;max-width:250px">
+              <option value="">выбрать SKU…</option>
+              {% for s in skus %}<option value="{{ s }}">{{ s|truncatechars:48 }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="btn" style="padding:6px 12px">+</button>
+          </form>
+        </td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="foot">Кнопка ✕ на плашке убирает привязку. «Свой бренд» — это основной SKU, остальные — СТМ/другие бренды того же рецепта. Маржа считается по каждому SKU отдельно на вкладке «Себестоимость».</div>
+</div>
+{% endif %}
+{% endblock %}

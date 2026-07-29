@@ -9,13 +9,14 @@
 </section>
 
 <div class="card wide">
-  <div class="ch"><span>Маржа по позициям</span><small>цена продажи {{ c.year }} · маржа считается без НДС · худшие сверху</small></div>
+  <div class="ch"><span>Маржа по позициям и брендам</span><small>цена продажи {{ c.year }} · маржа без НДС · худшие сверху · <a href="{% url 'cost_map' %}" class="link">привязать SKU →</a></small></div>
   {% if c.mapped %}
   <table>
-    <thead><tr><th>Позиция</th><th>Себест. без НДС</th><th>Себест. с НДС</th><th>Цена продажи</th><th>Маржа ₽</th><th>Маржа %</th></tr></thead>
+    <thead><tr><th>Позиция</th><th>Бренд</th><th>Себест. без НДС</th><th>Себест. с НДС</th><th>Цена продажи</th><th>Маржа ₽</th><th>Маржа %</th></tr></thead>
     <tbody>
       {% for r in c.mapped %}<tr {% if r.mp < 15 %}class="bad"{% endif %}>
         <td>{{ r.name }}</td>
+        <td><span class="pill">{{ r.brand }}</span></td>
         <td>{{ r.cost|intcomma }} ₽</td>
         <td>{{ r.cost_vat|intcomma }} ₽</td>
         <td>{{ r.price|intcomma }} ₽ <span style="color:var(--ink2);font-size:11px">с НДС</span></td>

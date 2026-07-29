@@ -243,6 +243,21 @@ class CostItem(models.Model):
         return self.name
 
 
+class CostSku(models.Model):
+    """Доп. SKU для позиции себестоимости: один рецепт — несколько брендов (свой + СТМ)."""
+    cost = models.ForeignKey(CostItem, on_delete=models.CASCADE, related_name='skus',
+                             verbose_name='Позиция себестоимости')
+    sku = models.CharField('SKU (карточка 1С)', max_length=255, db_index=True)
+
+    class Meta:
+        verbose_name = 'SKU позиции'
+        verbose_name_plural = 'SKU позиций себестоимости'
+        unique_together = [('cost', 'sku')]
+
+    def __str__(self):
+        return self.sku
+
+
 class PackagingItem(models.Model):
     """Справочник упаковки: связь с батончиком (для расхода по продажам) + остаток."""
     upak = models.CharField('Упаковка', max_length=255, unique=True)
