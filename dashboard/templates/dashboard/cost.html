@@ -8,6 +8,41 @@
   <div class="kpi"><div class="kl">НДС</div><div class="kv sm">+{{ c.vat_pct }}<span class="cur">%</span></div><div class="kf">себест в файле без НДС</div></div>
 </section>
 
+{% if groups %}
+<div class="filters" style="margin:0 0 14px">
+  <span class="perlbl">Группа:</span>
+  <a href="?" class="perbtn {% if not sel_group %}on{% endif %}">все позиции</a>
+  {% for g in groups %}<a href="?group={{ g.id }}" class="perbtn {% if sel_group.id == g.id %}on{% endif %}">{{ g.name }}</a>{% endfor %}
+  <a href="/admin/dashboard/costgroup/" class="clearf">+ группа</a>
+</div>
+{% endif %}
+
+{% if report %}
+<section class="kpis">
+  <div class="kpi hero"><div class="kl">{{ sel_group.name }} · позиций</div><div class="kv">{{ report.rows|length }}</div><div class="kf">по реальным покупкам</div></div>
+  <div class="kpi"><div class="kl">Выручка (без НДС)</div><div class="kv sm">{{ report.total_rev|intcomma }} <span class="cur">₽</span></div><div class="kf">группа</div></div>
+  <div class="kpi"><div class="kl">Маржа</div><div class="kv sm">{{ report.total_margin|intcomma }} <span class="cur">₽</span></div><div class="kf">где привязана себест.</div></div>
+</section>
+<div class="card wide">
+  <div class="ch"><span>Что берёт группа «{{ sel_group.name }}»</span><small>реальные покупки контрагентов × себестоимость рецепта</small></div>
+  {% if report.rows %}
+  <table>
+    <thead><tr><th>Позиция (SKU)</th><th>Объём, шт</th><th>Выручка</th><th>Цена/шт</th><th>Себест./шт</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>
+    <tbody>
+      {% for r in report.rows %}<tr {% if r.mp != None and r.mp < 15 %}class="bad"{% endif %}>
+        <td>{{ r.sku }}</td><td>{{ r.qty|intcomma }}</td><td>{{ r.revenue|intcomma }} ₽</td>
+        <td>{{ r.price|intcomma }} ₽</td>
+        <td>{% if r.cost != None %}{{ r.cost|intcomma }} ₽{% else %}<span style="color:var(--ink2)">нет</span>{% endif %}</td>
+        <td>{% if r.margin != None %}{{ r.margin|intcomma }} ₽{% else %}—{% endif %}</td>
+        <td>{% if r.mp != None %}<b class="{% if r.mp < 15 %}bad{% elif r.mp >= 40 %}up{% endif %}">{{ r.mp }}%</b>{% else %}—{% endif %}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="foot">Реальные покупки контрагентов группы, сшито по номеру документа. «Себест. нет» — SKU не привязан к рецепту (<a href="{% url 'cost_map' %}" class="link">привязать</a>). Контрагентов в группе задаёшь в админке.</div>
+  {% else %}<div class="foot">Нет продаж по контрагентам этой группы.</div>{% endif %}
+</div>
+{% else %}
+
 <div class="card wide" style="margin-top:14px">
   <div class="ch"><span>Калькулятор скидок</span><small>какую скидку можно дать при этой себестоимости</small></div>
   <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
@@ -21,14 +56,7 @@
 </div>
 
 <div class="card wide" style="margin-top:14px">
-  <div class="ch"><span>Маржа по позициям{% if sel_group %}: {{ sel_group.name }}{% endif %}</span>
-    <span style="font-size:11px;font-weight:400;color:var(--ink2)">
-      группа:
-      <a href="?" class="perbtn {% if not sel_group %}on{% endif %}">все</a>
-      {% for g in groups %}<a href="?group={{ g.id }}" class="perbtn {% if sel_group.id == g.id %}on{% endif %}">{{ g.name }}</a>{% endfor %}
-      · <a href="/admin/dashboard/costgroup/" class="link">+ группа</a>
-    </span>
-  </div>
+  <div class="ch"><span>Маржа по позициям{% if sel_group %}: {{ sel_group.name }}{% endif %}</span><small>одна позиция — одна строка · <a href="{% url 'cost_map' %}" class="link">привязать SKU →</a></small></div>
   {% if c.mapped %}
   <table>
     <thead><tr><th>Позиция</th><th>Себест. без НДС</th><th>Себест. с НДС</th><th>Цена продажи</th><th>Маржа ₽/шт</th><th>Маржа %</th></tr></thead>
@@ -57,6 +85,7 @@
 </div>
 {% endif %}
 
+{% endif %}
 <script id="ddata" type="application/json">[{% for r in c.mapped %}{"n":"{{ r.name|escapejs }}","cost":{{ r.cost }},"price":{{ r.price }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
 <script>
 (function(){

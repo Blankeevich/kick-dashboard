@@ -8,7 +8,7 @@ from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
 class CostGroupAdmin(admin.ModelAdmin):
     list_display = ('name', 'order')
     list_editable = ('order',)
-    filter_horizontal = ('items',)
+    filter_horizontal = ('items', 'clients')
 
 
 def _sku_choices(current=''):

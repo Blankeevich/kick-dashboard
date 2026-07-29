@@ -481,6 +481,42 @@ def _doc_channel_map(ly):
     return m
 
 
+def group_report(clients, vat=0.22):
+    """Что берут контрагенты группы: SKU × объём × цена × себестоимость × маржа (по реальным продажам)."""
+    from collections import defaultdict
+    from django.db.models import Max
+    from .models import SkuDoc
+    ly = SkuFact.objects.aggregate(y=Max('year'))['y']
+    if not ly or not clients:
+        return {'rows': [], 'total_rev': 0, 'total_margin': 0}
+    cost_by, _n = _cost_by_sku()
+    docs = set(SalesFact.objects.filter(year=ly, client__in=clients)
+               .exclude(doc_no='').values_list('doc_no', flat=True))
+    agg = defaultdict(lambda: {'qty': 0, 'amount': 0})
+    for d in SkuDoc.objects.filter(year=ly, doc_no__in=docs).values('sku_raw', 'qty', 'amount'):
+        a = agg[d['sku_raw']]
+        a['qty'] += d['qty']
+        a['amount'] += d['amount']
+    rows = []
+    for sku, v in agg.items():
+        if v['qty'] <= 0:
+            continue
+        price = v['amount'] / v['qty']
+        price_nv = price / (1 + vat)
+        cost = cost_by.get(_n(sku))
+        r = {'sku': sku, 'qty': int(v['qty']), 'revenue': round(v['amount']),
+             'price': round(price), 'cost': round(cost) if cost is not None else None}
+        if cost is not None:
+            margin = price_nv - cost
+            r.update({'margin': round(margin), 'margin_sum': round(margin * v['qty']),
+                      'mp': round(margin / price_nv * 100) if price_nv else 0})
+        rows.append(r)
+    rows.sort(key=lambda x: -x['revenue'])
+    return {'rows': rows, 'total_rev': round(sum(r['revenue'] for r in rows) / (1 + vat)),
+            'total_margin': round(sum(r.get('margin_sum', 0) for r in rows)),
+            'covered': sum(1 for r in rows if r['cost'] is not None)}
+
+
 def channel_positions(code, vat=0.22):
     """Что берёт канал: позиции (SKU) с объёмом, ценой, себестоимостью и маржой."""
     from collections import defaultdict

@@ -262,7 +262,9 @@ class CostGroup(models.Model):
     """Своя группа позиций себестоимости (например «Перекрёсток», «Сети») — ведётся вручную."""
     name = models.CharField('Название группы', max_length=120, unique=True)
     items = models.ManyToManyField('CostItem', blank=True, related_name='groups',
-                                   verbose_name='Позиции себестоимости в группе')
+                                   verbose_name='Позиции себестоимости (ручной список)')
+    clients = models.ManyToManyField('Client', blank=True, related_name='cost_groups',
+                                     verbose_name='Контрагенты (считать по их реальным покупкам)')
     order = models.IntegerField('Порядок', default=0)
 
     class Meta:

@@ -268,8 +268,13 @@ def cost(request):
     except (TypeError, ValueError):
         gid = None
     sel = next((g for g in groups if g.id == gid), None)
-    return render(request, 'dashboard/cost.html', {'page': 'cost',
-                  'c': metrics.cost_margin(group=sel), 'groups': groups, 'sel_group': sel})
+    ctx = {'page': 'cost', 'groups': groups, 'sel_group': sel}
+    if sel and sel.clients.exists():
+        ctx['report'] = metrics.group_report(list(sel.clients.values_list('name', flat=True)))
+        ctx['c'] = {'mapped': [], 'unmapped': [], 'vat_pct': 22, 'avg_margin': 0}
+    else:
+        ctx['c'] = metrics.cost_margin(group=sel)
+    return render(request, 'dashboard/cost.html', ctx)
 
 
 @login_required
