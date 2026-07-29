@@ -126,6 +126,11 @@ def load_sales_client(fileobj, filename, user=None):
                                    year=year, month=mnum, qty=qty or 0, amount=int(amt or 0)))
             total += int(amt or 0)
     SalesFact.objects.bulk_create(facts, batch_size=1000)
+    # завести в справочник всех покупателей (ровно под именем из продаж) — для групп/сшивки
+    have = set(Client.objects.values_list('name', flat=True))
+    new = {f.client for f in facts if f.client and f.client not in have}
+    if new:
+        Client.objects.bulk_create([Client(name=n) for n in new], ignore_conflicts=True)
     up.rows_loaded = len(facts)
     up.control_sum = total
     up.save()
