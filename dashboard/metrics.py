@@ -423,11 +423,14 @@ def cost_margin(vat=0.22):
     def _n(s):   # нормализуем имя SKU: убираем хвост «, шт», регистр, лишние пробелы
         return re.sub(r'\s*,?\s*шт\.?\s*$', '', str(s or '').strip(), flags=re.I).strip().lower()
     ly = SkuFact.objects.aggregate(y=Max('year'))['y']
-    price = {}
+    price, rev, qty = {}, {}, {}
     if ly:
         for r in SkuFact.objects.filter(year=ly, qty__gt=0).values('sku_raw').annotate(a=Sum('amount'), q=Sum('qty')):
             if r['q']:
-                price[_n(r['sku_raw'])] = r['a'] / r['q']    # цена с НДС, ключ нормализован
+                k = _n(r['sku_raw'])
+                price[k] = r['a'] / r['q']    # цена с НДС, ключ нормализован
+                rev[k] = r['a']
+                qty[k] = r['q']
     def brand(sku):    # короткая метка бренда/канала из имени карточки
         low = sku.lower()
         for key, lab in [('самокат', 'Самокат'), ('вкусвилл', 'ВкусВилл'), ('старс', 'Stars'),
@@ -455,17 +458,45 @@ def cost_margin(vat=0.22):
             if not p:
                 continue
             matched = True
+            k = _n(s)
             price_nv = p / (1 + vat)
             margin = price_nv - it.cost
+            revenue_nv = rev.get(k, 0) / (1 + vat)
             mapped.append({'line': it.line, 'name': it.name, 'sku': s, 'brand': brand(s),
                            'cost': round(it.cost), 'cost_vat': cost_vat, 'price': round(p),
                            'price_nv': round(price_nv), 'margin': round(margin),
-                           'mp': round(margin / price_nv * 100) if price_nv else 0})
+                           'mp': round(margin / price_nv * 100) if price_nv else 0,
+                           'qty': int(qty.get(k, 0)), 'revenue': round(rev.get(k, 0)),
+                           'margin_sum': round(margin * qty.get(k, 0)), 'revenue_nv': round(revenue_nv)})
         if not matched:
             unmapped.append({'line': it.line, 'name': it.name, 'cost': round(it.cost), 'cost_vat': cost_vat})
     mapped.sort(key=lambda r: r['mp'])
+    # сводка по брендам (взвешенно по объёму) + свой vs СТМ
+    from collections import defaultdict
+    bagg = defaultdict(lambda: {'rev_nv': 0, 'margin_sum': 0, 'n': 0})
+    for r in mapped:
+        b = bagg[r['brand']]
+        b['rev_nv'] += r['revenue_nv']
+        b['margin_sum'] += r['margin_sum']
+        b['n'] += 1
+    by_brand = [{'brand': k, 'revenue': v['rev_nv'], 'margin': v['margin_sum'], 'n': v['n'],
+                 'mp': round(v['margin_sum'] / v['rev_nv'] * 100) if v['rev_nv'] else 0}
+                for k, v in bagg.items()]
+    by_brand.sort(key=lambda r: -r['revenue'])
+    own = {'rev': 0, 'm': 0}
+    stm = {'rev': 0, 'm': 0}
+    for r in mapped:
+        t = own if r['brand'] == 'Свой бренд' else stm
+        t['rev'] += r['revenue_nv']
+        t['m'] += r['margin_sum']
+    groups = {'own_rev': own['rev'], 'own_m': own['m'],
+              'own_mp': round(own['m'] / own['rev'] * 100) if own['rev'] else 0,
+              'stm_rev': stm['rev'], 'stm_m': stm['m'],
+              'stm_mp': round(stm['m'] / stm['rev'] * 100) if stm['rev'] else 0}
     return {'mapped': mapped, 'unmapped': unmapped, 'year': ly, 'vat_pct': round(vat * 100),
-            'avg_margin': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0}
+            'avg_margin': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0,
+            'by_brand': by_brand, 'groups': groups,
+            'brands': sorted(bagg.keys())}
 
 
 def signals():
