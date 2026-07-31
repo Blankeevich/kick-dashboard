@@ -51,13 +51,17 @@
 <div class="card wide" style="margin-top:14px">
   <div class="ch"><span>Калькулятор скидок</span><small>какую скидку можно дать при этой себестоимости</small></div>
   <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
-    <div class="frow" style="min-width:280px;flex:1"><label>Позиция</label>
+    <div class="frow" style="min-width:240px;flex:1"><label>Позиция</label>
       <select id="dpos" style="font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%"></select></div>
-    <div class="frow" style="width:150px"><label>Скидка, %</label>
-      <input id="ddisc" type="number" min="0" max="60" step="1" value="10" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%"></div>
+    <div class="frow" style="width:150px"><label>Стоимость продажи, ₽</label>
+      <input id="dprice" type="number" min="0" step="1" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%"></div>
+    <div class="frow" style="width:120px"><label>Скидка, %</label>
+      <input id="ddisc" type="number" min="0" max="90" step="1" value="10" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%"></div>
+    <div class="frow" style="width:140px"><label>Объём, шт</label>
+      <input id="dqty" type="number" min="0" step="100" value="1000" style="font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%"></div>
   </div>
   <div id="dout" style="display:flex;flex-wrap:wrap;gap:20px;margin-top:14px;font-size:13px"></div>
-  <div class="foot">Цена продажи — средняя по SKU (с НДС). Маржа без НДС. «Скидка до нуля» — при какой скидке маржа станет 0.</div>
+  <div class="foot">Стоимость продажи подставляется средняя по SKU (с НДС), можно вбить свою. Выручка и маржа всего — с учётом объёма. «Скидка до нуля» — при какой скидке маржа станет 0.</div>
 </div>
 
 <div class="card wide" style="margin-top:14px">
@@ -105,21 +109,31 @@
 <script>
 (function(){
   var data=JSON.parse(document.getElementById('ddata').textContent||'[]');
-  var pos=document.getElementById('dpos'), disc=document.getElementById('ddisc'), out=document.getElementById('dout');
+  var pos=document.getElementById('dpos'), price=document.getElementById('dprice'),
+      disc=document.getElementById('ddisc'), qty=document.getElementById('dqty'), out=document.getElementById('dout');
   if(!data.length){return;}
   data.forEach(function(d,i){var o=document.createElement('option');o.value=i;o.textContent=d.n;pos.appendChild(o);});
   function fmt(n){return Math.round(n).toLocaleString('ru-RU');}
+  function fillPrice(){price.value=Math.round(data[pos.value].price);}
   function calc(){
-    var d=data[pos.value], k=Math.max(0,Math.min(60,parseFloat(disc.value)||0));
-    var np=d.price*(1-k/100), m=np-d.cost, mp=np?Math.round(m/np*100):0;
-    var zero=d.price>0?Math.round((1-d.cost/d.price)*100):0;
+    var d=data[pos.value];
+    var base=parseFloat(price.value); if(!isFinite(base)||base<0){base=d.price;}
+    var k=Math.max(0,Math.min(90,parseFloat(disc.value)||0));
+    var q=Math.max(0,parseFloat(qty.value)||0);
+    var np=base*(1-k/100), m=np-d.cost, mp=np?Math.round(m/np*100):0;
+    var zero=base>0?Math.round((1-d.cost/base)*100):0;
+    var revenue=np*q, marginTot=m*q;
     out.innerHTML=
       '<div><div style="color:var(--ink2)">Цена со скидкой (с НДС)</div><b style="font-size:18px">'+fmt(np)+' ₽</b></div>'+
-      '<div><div style="color:var(--ink2)">Маржа (с НДС)</div><b style="font-size:18px" class="'+(mp<15?'bad':'up')+'">'+fmt(m)+' ₽ · '+mp+'%</b></div>'+
+      '<div><div style="color:var(--ink2)">Маржа ₽/шт (с НДС)</div><b style="font-size:18px" class="'+(mp<15?'bad':'up')+'">'+fmt(m)+' ₽ · '+mp+'%</b></div>'+
       '<div><div style="color:var(--ink2)">Себестоимость (с НДС)</div><b style="font-size:18px">'+fmt(d.cost)+' ₽</b></div>'+
-      '<div><div style="color:var(--ink2)">Скидка до нуля маржи</div><b style="font-size:18px" class="'+(k>=zero?'bad':'')+'">'+zero+'%</b></div>';
+      '<div style="border-left:1px solid var(--line);padding-left:20px"><div style="color:var(--ink2)">Выручка (с НДС)</div><b style="font-size:18px">'+fmt(revenue)+' ₽</b></div>'+
+      '<div><div style="color:var(--ink2)">Маржа всего (с НДС)</div><b style="font-size:18px" class="'+(marginTot<0?'bad':'up')+'">'+fmt(marginTot)+' ₽</b></div>'+
+      '<div style="border-left:1px solid var(--line);padding-left:20px"><div style="color:var(--ink2)">Скидка до нуля маржи</div><b style="font-size:18px" class="'+(k>=zero?'bad':'')+'">'+zero+'%</b></div>';
   }
-  pos.addEventListener('change',calc); disc.addEventListener('input',calc); calc();
+  pos.addEventListener('change',function(){fillPrice();calc();});
+  price.addEventListener('input',calc); disc.addEventListener('input',calc); qty.addEventListener('input',calc);
+  fillPrice(); calc();
 })();
 (function(){
   var tgl=document.getElementById('tglnocost'), tbl=document.getElementById('rtbl');
