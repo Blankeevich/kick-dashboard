@@ -4,7 +4,7 @@
 {% if not report %}
 <section class="kpis">
   <div class="kpi hero"><div class="kl">Позиций с маржой</div><div class="kv">{{ c.mapped|length }}</div><div class="kf">себест из файла + цена продажи</div></div>
-  <div class="kpi"><div class="kl">Средняя маржа</div><div class="kv sm">{{ c.avg_margin }}<span class="cur">%</span></div><div class="kf">по позициям</div></div>
+  <div class="kpi" data-tip="Простое среднее по позициям: {{ c.avg_margin_simple }}%"><div class="kl">Средняя маржа</div><div class="kv sm">{{ c.avg_margin }}<span class="cur">%</span></div><div class="kf">взвешенно по выручке</div></div>
   <div class="kpi"><div class="kl">НДС</div><div class="kv sm">+{{ c.vat_pct }}<span class="cur">%</span></div><div class="kf">себест в файле без НДС</div></div>
 </section>
 {% endif %}

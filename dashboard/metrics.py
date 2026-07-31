@@ -443,20 +443,26 @@ def cost_margin(vat=0.22, group=None):
         cost_vat = round(it.cost * (1 + vat))
         # цена своего бренда: первый привязанный SKU, у которого есть продажи
         p = None
+        pk = None
         for s in [it.sku] + [x.sku for x in it.skus.all()]:
             if s and _n(s) in price:
                 p = price[_n(s)]
+                pk = _n(s)
                 break
         if p:
             margin = p - cost_vat               # маржа с НДС
             mapped.append({'line': it.line, 'name': it.name,
                            'cost_vat': cost_vat, 'price': round(p), 'margin': round(margin),
-                           'mp': round(margin / p * 100) if p else 0})
+                           'mp': round(margin / p * 100) if p else 0,
+                           'rev': round(rev.get(pk, 0))})       # выручка позиции — вес
         else:
             unmapped.append({'line': it.line, 'name': it.name, 'cost_vat': cost_vat})
     mapped.sort(key=lambda r: r['mp'])
+    tot_rev = sum(r['rev'] for r in mapped)
     return {'mapped': mapped, 'unmapped': unmapped, 'nocost': nocost, 'year': ly, 'vat_pct': round(vat * 100),
-            'avg_margin': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0}
+            # средневзвешенная маржа по выручке (батончик на 4 млн весит больше, чем на 50к)
+            'avg_margin': round(sum(r['mp'] * r['rev'] for r in mapped) / tot_rev) if tot_rev else 0,
+            'avg_margin_simple': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0}
 
 
 def _cost_by_sku():
