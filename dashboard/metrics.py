@@ -432,11 +432,14 @@ def cost_margin(vat=0.22, group=None):
                 price[k] = r['a'] / r['q']    # цена с НДС, ключ нормализован
                 rev[k] = r['a']
                 qty[k] = r['q']
-    mapped, unmapped = [], []
+    mapped, unmapped, nocost = [], [], []
     items = CostItem.objects.prefetch_related('skus')
     if group is not None:
         items = items.filter(groups=group)
     for it in items:
+        if not it.cost or it.cost <= 0:          # себестоимость ещё не задана
+            nocost.append({'line': it.line, 'name': it.name})
+            continue
         cost_vat = round(it.cost * (1 + vat))
         # цена своего бренда: первый привязанный SKU, у которого есть продажи
         p = None
@@ -452,7 +455,7 @@ def cost_margin(vat=0.22, group=None):
         else:
             unmapped.append({'line': it.line, 'name': it.name, 'cost_vat': cost_vat})
     mapped.sort(key=lambda r: r['mp'])
-    return {'mapped': mapped, 'unmapped': unmapped, 'year': ly, 'vat_pct': round(vat * 100),
+    return {'mapped': mapped, 'unmapped': unmapped, 'nocost': nocost, 'year': ly, 'vat_pct': round(vat * 100),
             'avg_margin': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0}
 
 
@@ -464,6 +467,8 @@ def _cost_by_sku():
         return re.sub(r'\s*,?\s*шт\.?\s*$', '', str(s or '').strip(), flags=re.I).strip().lower()
     d = {}
     for it in CostItem.objects.prefetch_related('skus'):
+        if not it.cost or it.cost <= 0:          # себестоимость не задана — пропускаем
+            continue
         for s in [it.sku] + [x.sku for x in it.skus.all()]:
             if s:
                 d[_n(s)] = it.cost
@@ -479,9 +484,10 @@ def _recipe_by_sku():
         return re.sub(r'\s*,?\s*шт\.?\s*$', '', str(s or '').strip(), flags=re.I).strip().lower()
     m = {}
     for it in CostItem.objects.prefetch_related('skus'):
+        c = it.cost if (it.cost and it.cost > 0) else None   # 0 = себестоимость не задана
         for s in [it.sku] + [x.sku for x in it.skus.all()]:
             if s:
-                m[_n(s)] = (it.id, it.name, it.cost)
+                m[_n(s)] = (it.id, it.name, c)
     return m, _n
 
 

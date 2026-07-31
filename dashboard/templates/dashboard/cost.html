@@ -79,6 +79,17 @@
   {% else %}<div class="foot">Нет привязанных позиций. <a href="{% url 'cost_map' %}" class="link">Привяжи SKU →</a></div>{% endif %}
 </div>
 
+{% if c.nocost %}
+<div class="card wide" style="margin-top:14px">
+  <div class="ch"><span>Ждут себестоимость</span><small>задай себестоимость в <a href="/admin/dashboard/costitem/" class="link">админке</a> (без НДС, +22% добавится автоматически)</small></div>
+  <table>
+    <thead><tr><th>Позиция</th><th>Линейка</th><th>Себестоимость</th></tr></thead>
+    <tbody>{% for r in c.nocost %}<tr><td>{{ r.name }}</td><td style="color:var(--ink2)">{{ r.line }}</td><td style="color:var(--amb)">не задана</td></tr>{% endfor %}</tbody>
+  </table>
+  <div class="foot">Эти рецепты заведены и SKU к ним привязан, но пока не считают маржу — как только впишешь себестоимость, появятся в таблице выше и в отчётах.</div>
+</div>
+{% endif %}
+
 {% if c.unmapped %}
 <div class="card wide" style="margin-top:14px">
   <div class="ch"><span>Без привязки к цене</span><small><a href="{% url 'cost_map' %}" class="link">привязать SKU →</a></small></div>
