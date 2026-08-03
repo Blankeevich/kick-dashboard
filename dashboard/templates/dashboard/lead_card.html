@@ -33,7 +33,7 @@
         <div class="sub">Прочее</div>
         <div class="two">
           <div class="frow"><label>Источник</label><input name="source" value="{{ lead.source }}"></div>
-          <div class="frow"><label>Ответственный</label><input name="owner" value="{{ lead.owner }}"></div>
+          <div class="frow"><label>Ответственный (менеджер)</label><input name="owner" value="{{ lead.owner }}" list="mgrlist"><datalist id="mgrlist">{% for m in managers %}<option value="{{ m.name }}">{% endfor %}</datalist></div>
         </div>
         <div class="two">
           <div class="frow"><label>Последний контакт</label><input type="date" name="last_touch" value="{{ lead.last_touch|date:'Y-m-d' }}"></div>

@@ -650,9 +650,11 @@ def leads(request):
         items = [r for r in rows if r.stage_id == st.id or (r.stage_id is None and st.id == default_id)]
         cols.append({'id': st.id, 'name': st.name, 'color': st.color, 'is_won': st.is_won, 'is_lost': st.is_lost,
                      'items': items, 'n': len(items), 'sum': sum(r.potential or 0 for r in items)})
+    from .models import SalesManager
     return render(request, 'dashboard/leads_board.html', {
         'page': 'leads', 'cols': cols, 'stages': stages, 'total': len(rows),
-        'sel_channel': sel_channel, 'q': request.GET.get('q', ''), 'channels': Lead.CHANNELS})
+        'sel_channel': sel_channel, 'q': request.GET.get('q', ''), 'channels': Lead.CHANNELS,
+        'managers': list(SalesManager.objects.filter(active=True))})
 
 
 @login_required
@@ -806,10 +808,12 @@ def lead_card(request, lead_id):
             'debt_date': dsnap.date if dsnap else None,
             'manager': mgr,
         }
+    from .models import SalesManager
     return render(request, 'dashboard/lead_card.html', {
         'page': 'leads', 'lead': lead, 'saved': saved, 'converted': converted,
         'notes': list(lead.notes.all()), 'is_client': is_client, 'erp': erp,
-        'channels': Lead.CHANNELS, 'stages': list(LeadStage.objects.all())})
+        'channels': Lead.CHANNELS, 'stages': list(LeadStage.objects.all()),
+        'managers': list(SalesManager.objects.filter(active=True))})
 
 
 @login_required

@@ -2,7 +2,14 @@ from django import forms
 from django.contrib import admin
 from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
                      SalesFact, DebtSnapshot, ManagerProfile, CostItem, CostSku, SkuFact, CostGroup,
-                     Lead, LeadStage, LeadNote)
+                     Lead, LeadStage, LeadNote, SalesManager)
+
+
+@admin.register(SalesManager)
+class SalesManagerAdmin(admin.ModelAdmin):
+    list_display = ('name', 'active')
+    list_editable = ('active',)
+    search_fields = ('name',)
 
 
 @admin.register(LeadStage)

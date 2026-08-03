@@ -64,6 +64,7 @@
       <div class="frow"><label>Потенциал сделки, ₽</label><input name="potential" type="number" min="0"></div>
       <div class="frow"><label>Канал</label><select name="channel"><option value="">—</option>{% for c,l in channels %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select></div>
       <div class="frow"><label>Город</label><input name="city"></div>
+      <div class="frow"><label>Менеджер</label><select name="owner"><option value="">—</option>{% for m in managers %}<option value="{{ m.name }}">{{ m.name }}</option>{% endfor %}</select></div>
       <div class="frow"><label>Контакт</label><input name="contact"></div>
       <div class="frow"><label>Телефон</label><input name="phone"></div>
       <div class="frow"><label>Сайт</label><input name="website" placeholder="example.ru"></div>

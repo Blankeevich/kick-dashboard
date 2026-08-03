@@ -291,6 +291,20 @@ class CostSku(models.Model):
         return self.sku
 
 
+class SalesManager(models.Model):
+    """Справочник менеджеров (для выбора в лидах и т.п.). Заводится вручную + из продаж."""
+    name = models.CharField('Менеджер', max_length=160, unique=True)
+    active = models.BooleanField('Активен', default=True)
+
+    class Meta:
+        verbose_name = 'Менеджер'
+        verbose_name_plural = 'Менеджеры (справочник)'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class LeadStage(models.Model):
     """Настраиваемый этап воронки (колонка на канбан-доске). Пользователь заводит сам."""
     name = models.CharField('Название этапа', max_length=80)
