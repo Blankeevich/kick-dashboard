@@ -83,8 +83,9 @@
     </div>
     <div class="bbody" data-stage="{{ col.id }}" data-color="{{ col.color }}">
       {% for it in col.items %}
-      <div class="lcard" draggable="true" data-id="{{ it.id }}" data-pot="{{ it.potential|default:0 }}">
-        <div class="lc"><a href="{% url 'lead_card' it.id %}">{{ it.company }}</a></div>
+      <div class="lcard" draggable="true" data-id="{{ it.id }}" data-pot="{{ it.potential|default:0 }}"
+           data-url="{% url 'lead_card' it.id %}" onclick="if(!this.classList.contains('drag'))location.href=this.dataset.url">
+        <div class="lc">{{ it.company }}</div>
         {% if it.potential %}<div class="lp">{{ it.potential|intcomma }} ₽</div>{% endif %}
         <div class="lm">
           {% if it.city %}<span>{{ it.city }}</span>{% endif %}

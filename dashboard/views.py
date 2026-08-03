@@ -788,10 +788,27 @@ def lead_card(request, lead_id):
         lead.next_action = _pdate((request.POST.get('next_action') or '').strip())
         lead.save()
         saved = True
-    from .models import Client
+    from .models import Client, SalesFact, DebtClientSnapshot
+    from django.db.models import Sum
+    is_client = Client.objects.filter(name=lead.company).exists()
+    # 360°: подтягиваем данные из 1С, если компания есть в продажах/дебиторке
+    sales_rows = list(SalesFact.objects.filter(client=lead.company)
+                      .values('year').annotate(a=Sum('amount')).order_by('-year'))
+    dsnap = DebtClientSnapshot.objects.filter(client=lead.company).order_by('-date').first()
+    mgr = (SalesFact.objects.filter(client=lead.company).exclude(manager='')
+           .values_list('manager', flat=True).first())
+    erp = None
+    if sales_rows or dsnap:
+        erp = {
+            'sales': [{'year': r['year'], 'amount': round(r['a'] or 0)} for r in sales_rows],
+            'debt': round(dsnap.debt_total) if dsnap else 0,
+            'overdue': round(dsnap.debt_overdue) if dsnap else 0,
+            'debt_date': dsnap.date if dsnap else None,
+            'manager': mgr,
+        }
     return render(request, 'dashboard/lead_card.html', {
         'page': 'leads', 'lead': lead, 'saved': saved, 'converted': converted,
-        'notes': list(lead.notes.all()), 'is_client': Client.objects.filter(name=lead.company).exists(),
+        'notes': list(lead.notes.all()), 'is_client': is_client, 'erp': erp,
         'channels': Lead.CHANNELS, 'stages': list(LeadStage.objects.all())})
 
 
