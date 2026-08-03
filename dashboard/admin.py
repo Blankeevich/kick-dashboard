@@ -92,7 +92,8 @@ class CostItemAdmin(admin.ModelAdmin):
 
 @admin.register(ManagerProfile)
 class ManagerProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'manager')
+    list_display = ('user', 'manager', 'can_edit_all')
+    list_editable = ('can_edit_all',)
     search_fields = ('user__username', 'manager')
 
 MONTHS_RU = [(i, n) for i, n in enumerate(

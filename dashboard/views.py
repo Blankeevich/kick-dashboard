@@ -423,7 +423,8 @@ def client_card(request, client):
         sel_y = years[0] if years else CUR_YEAR
     p = metrics.client_profile(client, sel_y, sel_y - 1)
     prof = ManagerProfile.objects.filter(user=request.user).first()
-    can_edit = bool(request.user.is_staff or (prof and prof.manager and prof.manager == p['owner_manager']))
+    can_edit = bool(request.user.is_staff or (prof and (prof.can_edit_all
+                    or (prof.manager and prof.manager == p['owner_manager']))))
     saved = False
     if request.method == 'POST' and request.POST.get('action') == 'delete' and request.user.is_staff:
         from django.shortcuts import redirect

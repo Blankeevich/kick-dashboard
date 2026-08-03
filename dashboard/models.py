@@ -197,6 +197,7 @@ class ManagerProfile(models.Model):
     """Связь аккаунта с менеджером (как он зовётся в продажах) — для прав на редактирование своих клиентов."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name='Аккаунт')
     manager = models.CharField('Менеджер (как в продажах)', max_length=255, blank=True)
+    can_edit_all = models.BooleanField('Может редактировать всех клиентов', default=False)
 
     class Meta:
         verbose_name = 'Профиль менеджера'
