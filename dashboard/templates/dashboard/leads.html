@@ -13,8 +13,7 @@
 
 <div class="filters" style="margin:0 0 14px">
   <form method="get" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <input type="text" name="q" value="{{ q }}" placeholder="поиск: компания / ИНН / город"
-      style="font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:230px">
+    <input type="text" name="q" value="{{ q }}" placeholder="поиск: компания / ИНН / город" style="min-width:230px">
     <select name="channel" onchange="this.form.submit()"><option value="">Канал: все</option>
       {% for c,l in channels %}<option value="{{ c }}" {% if c == sel_channel %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
     {% if sel_stage %}<input type="hidden" name="stage" value="{{ sel_stage }}">{% endif %}

@@ -40,9 +40,8 @@
 </style>
 
 <div class="toolbar">
-  <form method="get" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <input type="text" name="q" value="{{ q }}" placeholder="поиск компании / ИНН / города"
-      style="font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:220px">
+  <form method="get" class="filters" style="margin:0">
+    <input type="text" name="q" value="{{ q }}" placeholder="поиск компании / ИНН / города" style="min-width:220px">
     <select name="channel" onchange="this.form.submit()"><option value="">Канал: все</option>
       {% for c,l in channels %}<option value="{{ c }}" {% if c == sel_channel %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
     <button class="btn" type="submit">Найти</button>
