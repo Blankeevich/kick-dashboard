@@ -1,0 +1,39 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Этапы воронки{% endblock %}
+{% block content %}
+
+<div style="margin-bottom:12px"><a href="{% url 'leads' %}" class="link">← к доске лидов</a></div>
+
+<div class="card wide" style="margin-bottom:14px">
+  <div class="ch"><span>Этапы воронки</span><small>колонки на канбан-доске · порядок слева направо по числу</small></div>
+  <form method="post" id="savef">{% csrf_token %}<input type="hidden" name="action" value="save">
+    <table>
+      <thead><tr><th>Название этапа</th><th style="width:90px">Порядок</th><th style="width:110px">Успех</th><th style="width:90px">Отказ</th><th style="width:90px"></th></tr></thead>
+      <tbody>
+        {% for s in stages %}
+        <tr>
+          <td><input name="name_{{ s.id }}" value="{{ s.name }}" style="width:100%;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px"></td>
+          <td><input name="order_{{ s.id }}" type="number" value="{{ s.order }}" style="width:70px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px"></td>
+          <td><label style="font-size:12px;color:var(--ink2)"><input type="checkbox" name="won_{{ s.id }}" {% if s.is_won %}checked{% endif %}> клиент</label></td>
+          <td><label style="font-size:12px;color:var(--ink2)"><input type="checkbox" name="lost_{{ s.id }}" {% if s.is_lost %}checked{% endif %}> отказ</label></td>
+          <td>{% if stages|length > 1 %}<button form="delf{{ s.id }}" type="submit" onclick="return confirm('Удалить этап «{{ s.name|escapejs }}»? Лиды из него станут без этапа.')" style="background:none;border:0;color:var(--redb);cursor:pointer;font:inherit;font-size:12px;padding:0">удалить</button>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="margin-top:12px"><button class="btn" type="submit">Сохранить</button></div>
+  </form>
+  <div class="foot">Отметка «Успех» красит колонку зелёным (стал клиентом), «Отказ» — красным. Порядок задаёт, в каком порядке идут колонки.</div>
+</div>
+
+{% for s in stages %}<form method="post" id="delf{{ s.id }}">{% csrf_token %}<input type="hidden" name="action" value="delete"><input type="hidden" name="sid" value="{{ s.id }}"></form>{% endfor %}
+
+<div class="card wide">
+  <div class="ch"><span>Добавить этап</span></div>
+  <form method="post" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">{% csrf_token %}<input type="hidden" name="action" value="add">
+    <div class="frow" style="min-width:260px"><label>Название нового этапа</label>
+      <input name="name" required style="font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px"></div>
+    <button class="btn" type="submit">Добавить этап</button>
+  </form>
+</div>
+{% endblock %}

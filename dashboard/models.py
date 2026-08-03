@@ -291,16 +291,24 @@ class CostSku(models.Model):
         return self.sku
 
 
+class LeadStage(models.Model):
+    """Настраиваемый этап воронки (колонка на канбан-доске). Пользователь заводит сам."""
+    name = models.CharField('Название этапа', max_length=80)
+    order = models.IntegerField('Порядок', default=0)
+    is_won = models.BooleanField('Успех (стал клиентом)', default=False)
+    is_lost = models.BooleanField('Отказ', default=False)
+
+    class Meta:
+        verbose_name = 'Этап воронки'
+        verbose_name_plural = 'Этапы воронки (лиды)'
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.name
+
+
 class Lead(models.Model):
-    """Потенциальный клиент (лид) с воронкой продаж."""
-    STATUS = [
-        ('new', 'Новый'),
-        ('contacted', 'Написали'),
-        ('replied', 'Ответил'),
-        ('negotiation', 'Переговоры'),
-        ('won', 'Стал клиентом'),
-        ('lost', 'Отказ'),
-    ]
+    """Потенциальный клиент (лид). Этап воронки — ссылка на настраиваемый LeadStage."""
     CHANNELS = [
         ('сети', 'Сетевой ритейл'),
         ('зож', 'ЗОЖ-розница'),
@@ -320,7 +328,9 @@ class Lead(models.Model):
     website = models.CharField('Сайт', max_length=200, blank=True)
     source = models.CharField('Источник', max_length=160, blank=True,
                               help_text='Где нашли: веб-поиск, выставка, рекомендация…')
-    status = models.CharField('Статус', max_length=20, choices=STATUS, default='new', db_index=True)
+    stage = models.ForeignKey(LeadStage, verbose_name='Этап', null=True, blank=True,
+                              on_delete=models.SET_NULL, related_name='leads')
+    potential = models.BigIntegerField('Потенциал сделки, ₽', null=True, blank=True)
     owner = models.CharField('Ответственный', max_length=160, blank=True)
     note = models.TextField('Заметки', blank=True)
     created_at = models.DateTimeField('Создан', auto_now_add=True)

@@ -1,15 +1,22 @@
 from django import forms
 from django.contrib import admin
 from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
-                     SalesFact, DebtSnapshot, ManagerProfile, CostItem, CostSku, SkuFact, CostGroup, Lead)
+                     SalesFact, DebtSnapshot, ManagerProfile, CostItem, CostSku, SkuFact, CostGroup,
+                     Lead, LeadStage)
+
+
+@admin.register(LeadStage)
+class LeadStageAdmin(admin.ModelAdmin):
+    list_display = ('name', 'order', 'is_won', 'is_lost')
+    list_editable = ('order', 'is_won', 'is_lost')
 
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    list_display = ('company', 'channel', 'city', 'status', 'owner', 'updated_at')
-    list_filter = ('status', 'channel', 'owner')
+    list_display = ('company', 'channel', 'city', 'stage', 'owner', 'updated_at')
+    list_filter = ('stage', 'channel', 'owner')
     search_fields = ('company', 'inn', 'city', 'contact', 'phone', 'email')
-    list_editable = ('status',)
+    list_editable = ('stage',)
 
 
 @admin.register(CostGroup)

@@ -7,7 +7,7 @@
 
 <div class="grid">
   <div class="card">
-    <div class="ch"><span>Карточка лида</span><small>{{ lead.get_status_display }}</small></div>
+    <div class="ch"><span>Карточка лида</span><small>{{ lead.stage.name|default:"—" }}</small></div>
     <form method="post">{% csrf_token %}
       <div class="cform">
         <div class="frow"><label>Компания</label><input name="company" value="{{ lead.company }}" required></div>
@@ -18,9 +18,10 @@
         <div class="two">
           <div class="frow"><label>Канал</label><select name="channel"><option value="">—</option>
             {% for c,l in channels %}<option value="{{ c }}" {% if c == lead.channel %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
-          <div class="frow"><label>Статус (воронка)</label><select name="status">
-            {% for c,l in statuses %}<option value="{{ c }}" {% if c == lead.status %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+          <div class="frow"><label>Этап (воронка)</label><select name="stage">
+            {% for s in stages %}<option value="{{ s.id }}" {% if s.id == lead.stage_id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></div>
         </div>
+        <div class="frow"><label>Потенциал сделки, ₽</label><input name="potential" type="number" min="0" value="{{ lead.potential|default:'' }}"></div>
         <div class="sub">Контакты</div>
         <div class="frow"><label>Контактное лицо</label><input name="contact" value="{{ lead.contact }}"></div>
         <div class="two">
@@ -46,7 +47,8 @@
   <div class="card">
     <div class="ch"><span>Сводка</span></div>
     <ul class="rows">
-      <li><span class="nm">Статус</span><span class="vl">{{ lead.get_status_display }}</span></li>
+      <li><span class="nm">Этап</span><span class="vl">{{ lead.stage.name|default:"—" }}</span></li>
+      <li><span class="nm">Потенциал</span><span class="vl">{% if lead.potential %}{{ lead.potential|floatformat:0 }} ₽{% else %}—{% endif %}</span></li>
       <li><span class="nm">Канал</span><span class="vl">{{ lead.get_channel_display|default:"—" }}</span></li>
       <li><span class="nm">Город</span><span class="vl">{{ lead.city|default:"—" }}</span></li>
       <li><span class="nm">Ответственный</span><span class="vl">{{ lead.owner|default:"—" }}</span></li>

@@ -517,8 +517,17 @@ _LEAD_HMAP = {
     'источник': 'source', 'source': 'source', 'откуда': 'source',
     'статус': 'status', 'status': 'status',
     'ответственный': 'owner', 'менеджер': 'owner', 'owner': 'owner',
+    'потенциал': 'potential', 'сумма': 'potential', 'бюджет': 'potential', 'potential': 'potential', 'сделка': 'potential',
     'заметки': 'note', 'заметка': 'note', 'комментарий': 'note', 'note': 'note', 'коммент': 'note',
 }
+
+
+def _to_int(s):
+    s = str(s or '').replace(' ', '').replace('\xa0', '').replace(',', '.')
+    try:
+        return int(float(s))
+    except (ValueError, TypeError):
+        return None
 
 
 def _parse_leads_file(f):
@@ -526,8 +535,6 @@ def _parse_leads_file(f):
     from .models import Lead
     ch_map = {l.lower(): c for c, l in Lead.CHANNELS}
     ch_map.update({c: c for c, _ in Lead.CHANNELS})
-    st_map = {l.lower(): c for c, l in Lead.STATUS}
-    st_map.update({c: c for c, _ in Lead.STATUS})
     name = (getattr(f, 'name', '') or '').lower()
     if name.endswith('.csv'):
         import io
@@ -571,53 +578,152 @@ def _parse_leads_file(f):
             return str(row[i]).strip() if (i is not None and i < len(row) and row[i] is not None) else ''
         rec = {k: g(k) for k in ('company', 'inn', 'city', 'contact', 'phone', 'email', 'website', 'source', 'owner', 'note')}
         rec['channel'] = ch_map.get(g('channel').lower(), '')
-        rec['status'] = st_map.get(g('status').lower(), '')
+        rec['stage_name'] = g('status')          # текст этапа из файла — сопоставим при импорте
+        rec['potential'] = _to_int(g('potential'))
         if rec['company']:
             out.append(rec)
     return out
 
 
-@login_required
-def leads(request):
-    from django.shortcuts import redirect
+def _default_stage():
+    from .models import LeadStage
+    return LeadStage.objects.order_by('order', 'id').first()
+
+
+def _stage_by_id(sid):
+    from .models import LeadStage
+    try:
+        return LeadStage.objects.filter(id=int(sid)).first()
+    except (TypeError, ValueError):
+        return None
+
+
+def _lead_add_from_post(request):
     from .models import Lead
-    if request.method == 'POST' and request.POST.get('action') == 'add':
-        comp = (request.POST.get('company') or '').strip()
-        if comp:
-            Lead.objects.create(
-                company=comp, inn=(request.POST.get('inn') or '').strip(),
-                channel=request.POST.get('channel') or '', city=(request.POST.get('city') or '').strip(),
-                contact=(request.POST.get('contact') or '').strip(), phone=(request.POST.get('phone') or '').strip(),
-                email=(request.POST.get('email') or '').strip(), website=(request.POST.get('website') or '').strip(),
-                source=(request.POST.get('source') or '').strip(), owner=(request.POST.get('owner') or '').strip(),
-                status=request.POST.get('status') or 'new')
-        return redirect('leads')
-    q = (request.GET.get('q') or '').strip().lower()
-    sel_status = request.GET.get('status') or ''
+    comp = (request.POST.get('company') or '').strip()
+    if comp:
+        stage = _stage_by_id(request.POST.get('stage')) or _default_stage()
+        Lead.objects.create(
+            company=comp, inn=(request.POST.get('inn') or '').strip(),
+            channel=request.POST.get('channel') or '', city=(request.POST.get('city') or '').strip(),
+            contact=(request.POST.get('contact') or '').strip(), phone=(request.POST.get('phone') or '').strip(),
+            email=(request.POST.get('email') or '').strip(), website=(request.POST.get('website') or '').strip(),
+            source=(request.POST.get('source') or '').strip(), owner=(request.POST.get('owner') or '').strip(),
+            potential=_to_int(request.POST.get('potential')), stage=stage)
+
+
+def _lead_filter(request):
+    from .models import Lead
     sel_channel = request.GET.get('channel') or ''
-    all_rows = list(Lead.objects.all())
-    counts = {k: 0 for k, _ in Lead.STATUS}
-    for r in all_rows:
-        counts[r.status] = counts.get(r.status, 0) + 1
-    funnel = [{'code': k, 'label': v, 'n': counts.get(k, 0)} for k, v in Lead.STATUS]
-    rows = all_rows
-    if sel_status:
-        rows = [r for r in rows if r.status == sel_status]
+    q = (request.GET.get('q') or '').strip().lower()
+    rows = list(Lead.objects.select_related('stage').all())
     if sel_channel:
         rows = [r for r in rows if r.channel == sel_channel]
     if q:
         rows = [r for r in rows if q in r.company.lower() or q in (r.inn or '') or q in (r.city or '').lower()]
+    return rows, sel_channel
+
+
+@login_required
+def leads(request):
+    """Канбан-доска: колонки — настраиваемые этапы воронки, карточки перетаскиваются мышкой."""
+    from django.shortcuts import redirect
+    from .models import Lead, LeadStage
+    if request.method == 'POST' and request.POST.get('action') == 'add':
+        _lead_add_from_post(request)
+        return redirect('leads')
+    rows, sel_channel = _lead_filter(request)
+    stages = list(LeadStage.objects.all())
+    default_id = stages[0].id if stages else None
+    cols = []
+    for st in stages:
+        items = [r for r in rows if r.stage_id == st.id or (r.stage_id is None and st.id == default_id)]
+        cols.append({'id': st.id, 'name': st.name, 'is_won': st.is_won, 'is_lost': st.is_lost,
+                     'items': items, 'n': len(items), 'sum': sum(r.potential or 0 for r in items)})
+    return render(request, 'dashboard/leads_board.html', {
+        'page': 'leads', 'cols': cols, 'stages': stages, 'total': len(rows),
+        'sel_channel': sel_channel, 'q': request.GET.get('q', ''), 'channels': Lead.CHANNELS})
+
+
+@login_required
+def leads_list(request):
+    """Табличный вид лидов с воронкой-фильтром по этапам."""
+    from django.shortcuts import redirect
+    from .models import Lead, LeadStage
+    if request.method == 'POST' and request.POST.get('action') == 'add':
+        _lead_add_from_post(request)
+        return redirect('leads_list')
+    stages = list(LeadStage.objects.all())
+    all_rows = list(Lead.objects.select_related('stage').all())
+    counts = {st.id: 0 for st in stages}
+    for r in all_rows:
+        if r.stage_id in counts:
+            counts[r.stage_id] += 1
+    funnel = [{'id': st.id, 'name': st.name, 'n': counts.get(st.id, 0)} for st in stages]
+    sel_stage = request.GET.get('stage') or ''
+    rows, sel_channel = _lead_filter(request)
+    if sel_stage:
+        rows = [r for r in rows if str(r.stage_id) == sel_stage]
+    won = sum(1 for r in all_rows if r.stage and r.stage.is_won)
+    lost = sum(1 for r in all_rows if r.stage and r.stage.is_lost)
     return render(request, 'dashboard/leads.html', {
         'page': 'leads', 'rows': rows, 'funnel': funnel, 'total': len(all_rows), 'found': len(rows),
-        'sel_status': sel_status, 'sel_channel': sel_channel, 'q': request.GET.get('q', ''),
-        'channels': Lead.CHANNELS, 'statuses': Lead.STATUS,
-        'won': counts.get('won', 0), 'active': len(all_rows) - counts.get('won', 0) - counts.get('lost', 0)})
+        'sel_stage': sel_stage, 'sel_channel': sel_channel, 'q': request.GET.get('q', ''),
+        'channels': Lead.CHANNELS, 'stages': stages,
+        'won': won, 'active': len(all_rows) - won - lost})
+
+
+@login_required
+def lead_move(request, lead_id):
+    """Перемещение карточки между этапами (drag-and-drop)."""
+    from django.http import JsonResponse
+    from django.shortcuts import get_object_or_404
+    from .models import Lead
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+    stage = _stage_by_id(request.POST.get('stage'))
+    if not stage:
+        return JsonResponse({'ok': False, 'error': 'bad stage'}, status=400)
+    lead = get_object_or_404(Lead, id=lead_id)
+    lead.stage = stage
+    lead.save(update_fields=['stage', 'updated_at'])
+    return JsonResponse({'ok': True, 'id': lead.id, 'stage': stage.id})
+
+
+@login_required
+def lead_stages(request):
+    """Настройка этапов воронки: добавить/переименовать/переставить/удалить."""
+    from django.shortcuts import redirect
+    from .models import LeadStage
+    if request.method == 'POST':
+        act = request.POST.get('action')
+        if act == 'add':
+            nm = (request.POST.get('name') or '').strip()
+            if nm:
+                mx = LeadStage.objects.count()
+                LeadStage.objects.create(name=nm, order=mx)
+        elif act == 'save':
+            for st in LeadStage.objects.all():
+                nm = (request.POST.get('name_%d' % st.id) or '').strip()
+                od = _to_int(request.POST.get('order_%d' % st.id))
+                st.name = nm or st.name
+                st.order = od if od is not None else st.order
+                st.is_won = request.POST.get('won_%d' % st.id) == 'on'
+                st.is_lost = request.POST.get('lost_%d' % st.id) == 'on'
+                st.save()
+        elif act == 'delete':
+            sid = _stage_by_id(request.POST.get('sid'))
+            if sid and LeadStage.objects.count() > 1:
+                sid.delete()
+        return redirect('lead_stages')
+    stages = list(LeadStage.objects.all())
+    return render(request, 'dashboard/lead_stages.html', {'page': 'leads', 'stages': stages})
 
 
 @login_required
 def lead_card(request, lead_id):
     from django.shortcuts import redirect, get_object_or_404
-    from .models import Lead
+    from .models import Lead, LeadStage
     lead = get_object_or_404(Lead, id=lead_id)
     saved = False
     if request.method == 'POST':
@@ -625,8 +731,10 @@ def lead_card(request, lead_id):
             lead.delete()
             return redirect('leads')
         for fld in ('company', 'inn', 'channel', 'city', 'contact', 'phone', 'email',
-                    'website', 'source', 'owner', 'status', 'note'):
+                    'website', 'source', 'owner', 'note'):
             setattr(lead, fld, (request.POST.get(fld) or '').strip())
+        lead.stage = _stage_by_id(request.POST.get('stage')) or lead.stage
+        lead.potential = _to_int(request.POST.get('potential'))
         lt = (request.POST.get('last_touch') or '').strip()
         if lt:
             lead.last_touch = _pdate(lt)
@@ -634,18 +742,20 @@ def lead_card(request, lead_id):
         saved = True
     return render(request, 'dashboard/lead_card.html', {
         'page': 'leads', 'lead': lead, 'saved': saved,
-        'channels': Lead.CHANNELS, 'statuses': Lead.STATUS})
+        'channels': Lead.CHANNELS, 'stages': list(LeadStage.objects.all())})
 
 
 @login_required
 def lead_import(request):
-    from .models import Lead
+    from .models import Lead, LeadStage
     result = None
     if request.method == 'POST' and request.FILES.get('file'):
         try:
             parsed = _parse_leads_file(request.FILES['file'])
         except Exception as e:
             return render(request, 'dashboard/lead_import.html', {'page': 'leads', 'error': str(e)})
+        stage_by_name = {s.name.lower(): s for s in LeadStage.objects.all()}
+        default_stage = _default_stage()
         existing_inn = set(x for x in Lead.objects.exclude(inn='').values_list('inn', flat=True))
         existing_names = {c.lower() for c in Lead.objects.values_list('company', flat=True)}
         created = skipped = 0
@@ -654,10 +764,12 @@ def lead_import(request):
             if (inn and inn in existing_inn) or r['company'].lower() in existing_names:
                 skipped += 1
                 continue
+            stage = stage_by_name.get((r.get('stage_name') or '').lower(), default_stage)
             Lead.objects.create(
                 company=r['company'], inn=inn, channel=r['channel'], city=r['city'],
                 contact=r['contact'], phone=r['phone'], email=r['email'], website=r['website'],
-                source=r['source'] or 'импорт', owner=r['owner'], status=r['status'] or 'new', note=r['note'])
+                source=r['source'] or 'импорт', owner=r['owner'], stage=stage,
+                potential=r.get('potential'), note=r['note'])
             if inn:
                 existing_inn.add(inn)
             existing_names.add(r['company'].lower())
