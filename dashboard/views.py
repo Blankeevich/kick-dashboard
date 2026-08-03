@@ -519,6 +519,7 @@ _LEAD_HMAP = {
     'email': 'email', 'почта': 'email', 'e-mail': 'email', 'мейл': 'email', 'емейл': 'email',
     'сайт': 'website', 'website': 'website', 'url': 'website',
     'источник': 'source', 'source': 'source', 'откуда': 'source',
+    'соцсети': 'socials', 'соцсеть': 'socials', 'соц.сети': 'socials', 'socials': 'socials', 'соц': 'socials',
     'статус': 'status', 'status': 'status',
     'ответственный': 'owner', 'менеджер': 'owner', 'owner': 'owner',
     'потенциал': 'potential', 'сумма': 'potential', 'бюджет': 'potential', 'potential': 'potential', 'сделка': 'potential',
@@ -580,7 +581,7 @@ def _parse_leads_file(f):
         def g(k):
             i = idx.get(k)
             return str(row[i]).strip() if (i is not None and i < len(row) and row[i] is not None) else ''
-        rec = {k: g(k) for k in ('company', 'inn', 'city', 'contact', 'phone', 'email', 'website', 'source', 'owner', 'note')}
+        rec = {k: g(k) for k in ('company', 'inn', 'city', 'contact', 'phone', 'email', 'website', 'socials', 'source', 'owner', 'note')}
         rec['channel'] = ch_map.get(g('channel').lower(), '')
         rec['stage_name'] = g('status')          # текст этапа из файла — сопоставим при импорте
         rec['potential'] = _to_int(g('potential'))
@@ -612,6 +613,7 @@ def _lead_add_from_post(request):
             channel=request.POST.get('channel') or '', city=(request.POST.get('city') or '').strip(),
             contact=(request.POST.get('contact') or '').strip(), phone=(request.POST.get('phone') or '').strip(),
             email=(request.POST.get('email') or '').strip(), website=(request.POST.get('website') or '').strip(),
+            socials=(request.POST.get('socials') or '').strip(),
             source=(request.POST.get('source') or '').strip(), owner=(request.POST.get('owner') or '').strip(),
             potential=_to_int(request.POST.get('potential')), stage=stage)
 
@@ -778,7 +780,7 @@ def lead_card(request, lead_id):
             _convert_lead_to_client(lead, request.user)
             return redirect('lead_card', lead_id=lead.id)
         for fld in ('company', 'inn', 'channel', 'city', 'contact', 'phone', 'email',
-                    'website', 'source', 'owner', 'note'):
+                    'website', 'socials', 'source', 'owner', 'note'):
             setattr(lead, fld, (request.POST.get(fld) or '').strip())
         lead.stage = _stage_by_id(request.POST.get('stage')) or lead.stage
         lead.potential = _to_int(request.POST.get('potential'))
@@ -816,7 +818,7 @@ def lead_import(request):
             Lead.objects.create(
                 company=r['company'], inn=inn, channel=r['channel'], city=r['city'],
                 contact=r['contact'], phone=r['phone'], email=r['email'], website=r['website'],
-                source=r['source'] or 'импорт', owner=r['owner'], stage=stage,
+                socials=r.get('socials', ''), source=r['source'] or 'импорт', owner=r['owner'], stage=stage,
                 potential=r.get('potential'), note=r['note'])
             if inn:
                 existing_inn.add(inn)

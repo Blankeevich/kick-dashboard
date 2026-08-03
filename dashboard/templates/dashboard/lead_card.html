@@ -29,6 +29,7 @@
           <div class="frow"><label>Email</label><input name="email" value="{{ lead.email }}"></div>
         </div>
         <div class="frow"><label>Сайт</label><input name="website" value="{{ lead.website }}"></div>
+        <div class="frow"><label>Соцсети (ссылки, по одной в строке)</label><textarea name="socials" rows="2" placeholder="t.me/company&#10;vk.com/company&#10;instagram.com/company">{{ lead.socials }}</textarea></div>
         <div class="sub">Прочее</div>
         <div class="two">
           <div class="frow"><label>Источник</label><input name="source" value="{{ lead.source }}"></div>
@@ -73,6 +74,7 @@
       <li><span class="nm">Обновлён</span><span class="vl">{{ lead.updated_at|date:"d.m.Y H:i" }}</span></li>
     </ul>
     {% if lead.website %}<div class="foot"><a href="{% if '://' in lead.website %}{{ lead.website }}{% else %}https://{{ lead.website }}{% endif %}" target="_blank" rel="noopener" class="link">Открыть сайт →</a></div>{% endif %}
+    {% if lead.socials %}<div class="foot" style="line-height:1.9">Соцсети: {{ lead.socials|urlize|linebreaksbr }}</div>{% endif %}
     <div class="foot">
       <form method="post" onsubmit="return confirm('Удалить лид {{ lead.company|escapejs }}?')">{% csrf_token %}
         <input type="hidden" name="action" value="delete">

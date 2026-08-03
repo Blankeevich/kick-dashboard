@@ -327,6 +327,8 @@ class Lead(models.Model):
     phone = models.CharField('Телефон', max_length=80, blank=True)
     email = models.CharField('Email', max_length=160, blank=True)
     website = models.CharField('Сайт', max_length=200, blank=True)
+    socials = models.TextField('Соцсети (ссылки)', blank=True,
+                               help_text='Ссылки на соцсети, по одной в строке или через запятую')
     source = models.CharField('Источник', max_length=160, blank=True,
                               help_text='Где нашли: веб-поиск, выставка, рекомендация…')
     stage = models.ForeignKey(LeadStage, verbose_name='Этап', null=True, blank=True,
