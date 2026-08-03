@@ -621,13 +621,16 @@ def _lead_add_from_post(request):
 def _lead_filter(request):
     from .models import Lead
     sel_channel = request.GET.get('channel') or ''
+    sel_owner = request.GET.get('owner') or ''
     q = (request.GET.get('q') or '').strip().lower()
     rows = list(Lead.objects.select_related('stage').all())
     if sel_channel:
         rows = [r for r in rows if r.channel == sel_channel]
+    if sel_owner:
+        rows = [r for r in rows if r.owner == sel_owner]
     if q:
         rows = [r for r in rows if q in r.company.lower() or q in (r.inn or '') or q in (r.city or '').lower()]
-    return rows, sel_channel
+    return rows, sel_channel, sel_owner
 
 
 @login_required
@@ -638,7 +641,7 @@ def leads(request):
     if request.method == 'POST' and request.POST.get('action') == 'add':
         _lead_add_from_post(request)
         return redirect('leads')
-    rows, sel_channel = _lead_filter(request)
+    rows, sel_channel, sel_owner = _lead_filter(request)
     today = date.today()
     for r in rows:
         r.overdue = bool(r.next_action and r.next_action < today
@@ -653,7 +656,7 @@ def leads(request):
     from .models import SalesManager
     return render(request, 'dashboard/leads_board.html', {
         'page': 'leads', 'cols': cols, 'stages': stages, 'total': len(rows),
-        'sel_channel': sel_channel, 'q': request.GET.get('q', ''), 'channels': Lead.CHANNELS,
+        'sel_channel': sel_channel, 'sel_owner': sel_owner, 'q': request.GET.get('q', ''), 'channels': Lead.CHANNELS,
         'managers': list(SalesManager.objects.filter(active=True))})
 
 
@@ -673,15 +676,16 @@ def leads_list(request):
             counts[r.stage_id] += 1
     funnel = [{'id': st.id, 'name': st.name, 'n': counts.get(st.id, 0)} for st in stages]
     sel_stage = request.GET.get('stage') or ''
-    rows, sel_channel = _lead_filter(request)
+    rows, sel_channel, sel_owner = _lead_filter(request)
     if sel_stage:
         rows = [r for r in rows if str(r.stage_id) == sel_stage]
     won = sum(1 for r in all_rows if r.stage and r.stage.is_won)
     lost = sum(1 for r in all_rows if r.stage and r.stage.is_lost)
+    from .models import SalesManager
     return render(request, 'dashboard/leads.html', {
         'page': 'leads', 'rows': rows, 'funnel': funnel, 'total': len(all_rows), 'found': len(rows),
-        'sel_stage': sel_stage, 'sel_channel': sel_channel, 'q': request.GET.get('q', ''),
-        'channels': Lead.CHANNELS, 'stages': stages,
+        'sel_stage': sel_stage, 'sel_channel': sel_channel, 'sel_owner': sel_owner, 'q': request.GET.get('q', ''),
+        'channels': Lead.CHANNELS, 'stages': stages, 'managers': list(SalesManager.objects.filter(active=True)),
         'won': won, 'active': len(all_rows) - won - lost})
 
 
