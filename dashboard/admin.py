@@ -2,7 +2,15 @@ from django import forms
 from django.contrib import admin
 from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
                      SalesFact, DebtSnapshot, ManagerProfile, CostItem, CostSku, SkuFact, CostGroup,
-                     Lead, LeadStage, LeadNote, SalesManager)
+                     Lead, LeadStage, LeadNote, SalesManager, LeadLog)
+
+
+@admin.register(LeadLog)
+class LeadLogAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'user', 'action', 'company', 'detail')
+    list_filter = ('action', 'user')
+    search_fields = ('company', 'detail')
+    readonly_fields = ('created_at', 'user', 'action', 'lead_id', 'company', 'detail')
 
 
 @admin.register(SalesManager)

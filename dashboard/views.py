@@ -536,6 +536,24 @@ def _to_int(s):
         return None
 
 
+LEAD_ACTIONS = {
+    'add': 'Добавлен лид', 'edit': 'Изменён лид', 'move': 'Перемещён по воронке',
+    'convert': 'Заведён клиентом', 'delete': 'Удалён лид', 'note': 'Добавлена запись',
+    'import': 'Импорт лидов', 'stages': 'Изменены этапы',
+}
+
+
+def _lead_log(request, action, lead=None, company='', detail=''):
+    from .models import LeadLog
+    try:
+        LeadLog.objects.create(
+            user=(request.user.get_username() if request.user.is_authenticated else ''),
+            action=action, lead_id=(lead.id if lead else None),
+            company=(company or (lead.company if lead else '')), detail=detail)
+    except Exception:
+        pass   # логирование не должно ломать основное действие
+
+
 def _parse_leads_file(f):
     """Читает xlsx/csv с лидами → список dict. Заголовки распознаются гибко (рус/eng)."""
     from .models import Lead
@@ -609,7 +627,7 @@ def _lead_add_from_post(request):
     comp = (request.POST.get('company') or '').strip()
     if comp:
         stage = _stage_by_id(request.POST.get('stage')) or _default_stage()
-        Lead.objects.create(
+        lead = Lead.objects.create(
             company=comp, inn=(request.POST.get('inn') or '').strip(),
             channel=request.POST.get('channel') or '', city=(request.POST.get('city') or '').strip(),
             contact=(request.POST.get('contact') or '').strip(), phone=(request.POST.get('phone') or '').strip(),
@@ -617,6 +635,7 @@ def _lead_add_from_post(request):
             socials=(request.POST.get('socials') or '').strip(),
             source=(request.POST.get('source') or '').strip(), owner=(request.POST.get('owner') or '').strip(),
             potential=_to_int(request.POST.get('potential')), stage=stage)
+        _lead_log(request, 'add', lead, detail='этап: %s' % (stage.name if stage else '—'))
 
 
 def _lead_filter(request):
@@ -702,8 +721,10 @@ def lead_move(request, lead_id):
     if not stage:
         return JsonResponse({'ok': False, 'error': 'bad stage'}, status=400)
     lead = get_object_or_404(Lead, id=lead_id)
+    old = lead.stage.name if lead.stage else '—'
     lead.stage = stage
     lead.save(update_fields=['stage', 'updated_at'])
+    _lead_log(request, 'move', lead, detail='%s → %s' % (old, stage.name))
     return JsonResponse({'ok': True, 'id': lead.id, 'stage': stage.id})
 
 
@@ -735,6 +756,7 @@ def lead_stages(request):
             sid = _stage_by_id(request.POST.get('sid'))
             if sid and LeadStage.objects.count() > 1:
                 sid.delete()
+        _lead_log(request, 'stages', detail=act)
         return redirect('lead_stages')
     stages = list(LeadStage.objects.all())
     return render(request, 'dashboard/lead_stages.html', {'page': 'leads', 'stages': stages})
@@ -768,7 +790,9 @@ def lead_delete(request, lead_id):
     from .models import Lead
     if request.method != 'POST':
         return JsonResponse({'ok': False}, status=405)
-    get_object_or_404(Lead, id=lead_id).delete()
+    lead = get_object_or_404(Lead, id=lead_id)
+    _lead_log(request, 'delete', company=lead.company, detail='ID %s' % lead.id)
+    lead.delete()
     return JsonResponse({'ok': True})
 
 
@@ -812,6 +836,28 @@ def _convert_lead_to_client(lead, user):
 
 
 @login_required
+def lead_logs(request):
+    """Журнал действий по лидам — только для админов."""
+    from .models import LeadLog
+    if not request.user.is_staff:
+        return render(request, 'dashboard/lead_logs.html', {'page': 'leads', 'no_access': True})
+    sel_user = request.GET.get('user') or ''
+    sel_action = request.GET.get('action') or ''
+    qs = LeadLog.objects.all()
+    if sel_user:
+        qs = qs.filter(user=sel_user)
+    if sel_action:
+        qs = qs.filter(action=sel_action)
+    logs = list(qs[:500])
+    for l in logs:
+        l.action_label = LEAD_ACTIONS.get(l.action, l.action)
+    users = sorted(set(LeadLog.objects.exclude(user='').values_list('user', flat=True)))
+    return render(request, 'dashboard/lead_logs.html', {
+        'page': 'leads', 'logs': logs, 'users': users, 'actions': LEAD_ACTIONS,
+        'sel_user': sel_user, 'sel_action': sel_action, 'total': LeadLog.objects.count()})
+
+
+@login_required
 def lead_card(request, lead_id):
     from django.shortcuts import redirect, get_object_or_404
     from .models import Lead, LeadStage, LeadNote
@@ -820,15 +866,18 @@ def lead_card(request, lead_id):
     if request.method == 'POST':
         act = request.POST.get('action')
         if act == 'delete':
+            _lead_log(request, 'delete', company=lead.company, detail='ID %s' % lead.id)
             lead.delete()
             return redirect('leads')
         if act == 'note':
             txt = (request.POST.get('text') or '').strip()
             if txt:
                 LeadNote.objects.create(lead=lead, text=txt, author=request.user.get_username())
+                _lead_log(request, 'note', lead, detail=txt[:120])
             return redirect('lead_card', lead_id=lead.id)
         if act == 'convert':
             _convert_lead_to_client(lead, request.user)
+            _lead_log(request, 'convert', lead)
             return redirect('lead_card', lead_id=lead.id)
         for fld in ('company', 'inn', 'channel', 'city', 'contact', 'phone', 'email',
                     'website', 'socials', 'source', 'owner', 'note'):
@@ -838,6 +887,7 @@ def lead_card(request, lead_id):
         lead.last_touch = _pdate((request.POST.get('last_touch') or '').strip())
         lead.next_action = _pdate((request.POST.get('next_action') or '').strip())
         lead.save()
+        _lead_log(request, 'edit', lead, detail='этап: %s' % (lead.stage.name if lead.stage else '—'))
         saved = True
     from .models import Client, SalesManager
     is_client = Client.objects.filter(name=lead.company).exists()
@@ -879,6 +929,7 @@ def lead_import(request):
             existing_names.add(r['company'].lower())
             created += 1
         result = {'created': created, 'skipped': skipped, 'total': len(parsed)}
+        _lead_log(request, 'import', detail='создано %s, пропущено %s' % (created, skipped))
     return render(request, 'dashboard/lead_import.html', {'page': 'leads', 'result': result})
 
 

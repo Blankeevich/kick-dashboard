@@ -76,6 +76,7 @@
   <a href="{% url 'lead_import' %}" class="perbtn"><i class="ti ti-file-spreadsheet"></i> Импорт</a>
   <a href="{% url 'leads_list' %}" class="perbtn"><i class="ti ti-list"></i> Таблица</a>
   <a href="{% url 'lead_stages' %}" class="perbtn"><i class="ti ti-adjustments"></i> Этапы</a>
+  {% if user.is_staff %}<a href="{% url 'lead_logs' %}" class="perbtn"><i class="ti ti-history"></i> Логи</a>{% endif %}
 </div>
 
 <details id="addlead" class="card wide" style="margin-bottom:14px">

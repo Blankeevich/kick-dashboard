@@ -1,0 +1,38 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Логи лидов{% endblock %}
+{% block content %}
+<div style="margin-bottom:12px"><a href="{% url 'leads' %}" class="link">← к доске лидов</a></div>
+
+{% if no_access %}
+<div class="card wide"><div class="foot">Журнал действий доступен только администраторам.</div></div>
+{% else %}
+
+<div class="filters" style="margin:0 0 14px">
+  <form method="get" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <select name="user" onchange="this.form.submit()"><option value="">Кто: все</option>
+      {% for u in users %}<option value="{{ u }}" {% if u == sel_user %}selected{% endif %}>{{ u }}</option>{% endfor %}</select>
+    <select name="action" onchange="this.form.submit()"><option value="">Действие: все</option>
+      {% for code,label in actions.items %}<option value="{{ code }}" {% if code == sel_action %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    {% if sel_user or sel_action %}<a href="?" class="clearf">сбросить</a>{% endif %}
+  </form>
+</div>
+
+<div class="card wide">
+  <div class="ch"><span>Журнал действий по лидам</span><small>всего записей: {{ total }} · показаны последние 500</small></div>
+  {% if logs %}
+  <table>
+    <thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Компания</th><th>Детали</th></tr></thead>
+    <tbody>
+      {% for l in logs %}<tr>
+        <td style="white-space:nowrap">{{ l.created_at|date:"d.m.Y H:i" }}</td>
+        <td>{{ l.user|default:"—" }}</td>
+        <td>{{ l.action_label }}</td>
+        <td>{% if l.lead_id %}<a href="{% url 'lead_card' l.lead_id %}" class="link">{{ l.company }}</a>{% else %}{{ l.company|default:"—" }}{% endif %}</td>
+        <td style="color:var(--ink2)">{{ l.detail }}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="foot">Пока нет записей.</div>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

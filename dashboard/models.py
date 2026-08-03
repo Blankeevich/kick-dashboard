@@ -382,6 +382,24 @@ class LeadNote(models.Model):
         return '%s: %s' % (self.lead_id, self.text[:40])
 
 
+class LeadLog(models.Model):
+    """Журнал действий по лидам (аудит). Виден только админам."""
+    created_at = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
+    user = models.CharField('Кто', max_length=120, blank=True)
+    action = models.CharField('Действие', max_length=40)
+    lead_id = models.IntegerField('ID лида', null=True, blank=True)
+    company = models.CharField('Компания', max_length=255, blank=True)
+    detail = models.TextField('Детали', blank=True)
+
+    class Meta:
+        verbose_name = 'Лог лида'
+        verbose_name_plural = 'Логи лидов (аудит)'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return '%s %s %s' % (self.created_at, self.user, self.action)
+
+
 class PackagingItem(models.Model):
     """Справочник упаковки: связь с батончиком (для расхода по продажам) + остаток."""
     upak = models.CharField('Упаковка', max_length=255, unique=True)

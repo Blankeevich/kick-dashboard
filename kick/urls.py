@@ -23,6 +23,7 @@ urlpatterns = [
     path('leads/', views.leads, name='leads'),
     path('leads/list/', views.leads_list, name='leads_list'),
     path('leads/stages/', views.lead_stages, name='lead_stages'),
+    path('leads/logs/', views.lead_logs, name='lead_logs'),
     path('leads/import/', views.lead_import, name='lead_import'),
     path('leads/<int:lead_id>/move/', views.lead_move, name='lead_move'),
     path('leads/<int:lead_id>/delete/', views.lead_delete, name='lead_delete'),
