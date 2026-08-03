@@ -91,6 +91,7 @@
       <div class="frow"><label>Менеджер</label><select name="owner"><option value="">—</option>{% for m in managers %}<option value="{{ m.name }}">{{ m.name }}</option>{% endfor %}</select></div>
       <div class="frow"><label>Контакт</label><input name="contact"></div>
       <div class="frow"><label>Телефон</label><input name="phone"></div>
+      <div class="frow"><label>Email</label><input name="email" type="email" placeholder="mail@company.ru"></div>
       <div class="frow"><label>Сайт</label><input name="website" placeholder="example.ru"></div>
       <div class="frow"><label>Соцсети (ссылки)</label><input name="socials" placeholder="t.me/…, vk.com/…, instagram.com/…"></div>
     </div>
