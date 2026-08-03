@@ -884,3 +884,11 @@ def lead_import(request):
 
 class Login(LoginView):
     template_name = 'dashboard/login.html'
+
+
+def logout_view(request):
+    """Выход по обычной ссылке (GET). Встроенный LogoutView в Django 5 требует POST → 405."""
+    from django.contrib.auth import logout
+    from django.shortcuts import redirect
+    logout(request)
+    return redirect('login')
