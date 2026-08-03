@@ -295,6 +295,7 @@ class LeadStage(models.Model):
     """Настраиваемый этап воронки (колонка на канбан-доске). Пользователь заводит сам."""
     name = models.CharField('Название этапа', max_length=80)
     order = models.IntegerField('Порядок', default=0)
+    color = models.CharField('Цвет', max_length=9, default='#6d5bd0')
     is_won = models.BooleanField('Успех (стал клиентом)', default=False)
     is_lost = models.BooleanField('Отказ', default=False)
 
@@ -336,6 +337,8 @@ class Lead(models.Model):
     created_at = models.DateTimeField('Создан', auto_now_add=True)
     updated_at = models.DateTimeField('Обновлён', auto_now=True)
     last_touch = models.DateField('Последний контакт', null=True, blank=True)
+    next_action = models.DateField('Следующий шаг (дата)', null=True, blank=True)
+    converted = models.BooleanField('Заведён клиентом', default=False)
 
     class Meta:
         verbose_name = 'Лид'
@@ -344,6 +347,22 @@ class Lead(models.Model):
 
     def __str__(self):
         return self.company
+
+
+class LeadNote(models.Model):
+    """Запись в истории лида (активность/заметка/событие)."""
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='notes')
+    text = models.TextField('Текст')
+    author = models.CharField('Автор', max_length=120, blank=True)
+    created_at = models.DateTimeField('Когда', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'История лида'
+        verbose_name_plural = 'История лидов'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return '%s: %s' % (self.lead_id, self.text[:40])
 
 
 class PackagingItem(models.Model):

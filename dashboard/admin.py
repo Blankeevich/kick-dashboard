@@ -2,13 +2,18 @@ from django import forms
 from django.contrib import admin
 from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
                      SalesFact, DebtSnapshot, ManagerProfile, CostItem, CostSku, SkuFact, CostGroup,
-                     Lead, LeadStage)
+                     Lead, LeadStage, LeadNote)
 
 
 @admin.register(LeadStage)
 class LeadStageAdmin(admin.ModelAdmin):
-    list_display = ('name', 'order', 'is_won', 'is_lost')
-    list_editable = ('order', 'is_won', 'is_lost')
+    list_display = ('name', 'order', 'color', 'is_won', 'is_lost')
+    list_editable = ('order', 'color', 'is_won', 'is_lost')
+
+
+class LeadNoteInline(admin.TabularInline):
+    model = LeadNote
+    extra = 0
 
 
 @admin.register(Lead)
@@ -17,6 +22,7 @@ class LeadAdmin(admin.ModelAdmin):
     list_filter = ('stage', 'channel', 'owner')
     search_fields = ('company', 'inn', 'city', 'contact', 'phone', 'email')
     list_editable = ('stage',)
+    inlines = [LeadNoteInline]
 
 
 @admin.register(CostGroup)

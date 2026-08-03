@@ -34,14 +34,28 @@
           <div class="frow"><label>Источник</label><input name="source" value="{{ lead.source }}"></div>
           <div class="frow"><label>Ответственный</label><input name="owner" value="{{ lead.owner }}"></div>
         </div>
-        <div class="frow"><label>Последний контакт</label><input type="date" name="last_touch" value="{{ lead.last_touch|date:'Y-m-d' }}"></div>
-        <div class="frow"><label>Заметки</label><textarea name="note" rows="4">{{ lead.note }}</textarea></div>
+        <div class="two">
+          <div class="frow"><label>Последний контакт</label><input type="date" name="last_touch" value="{{ lead.last_touch|date:'Y-m-d' }}"></div>
+          <div class="frow"><label>Следующий шаг (дата)</label><input type="date" name="next_action" value="{{ lead.next_action|date:'Y-m-d' }}"></div>
+        </div>
+        <div class="frow"><label>Заметки</label><textarea name="note" rows="3">{{ lead.note }}</textarea></div>
         <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
           <button class="btn" type="submit">Сохранить</button>
           <a href="{% url 'leads' %}" class="link">отмена</a>
         </div>
       </div>
     </form>
+    {% if not is_client %}
+    <form method="post" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">{% csrf_token %}
+      <input type="hidden" name="action" value="convert">
+      <button class="btn" type="submit" style="background:var(--grn)"><i class="ti ti-user-check"></i> Завести клиентом</button>
+      <span style="font-size:12px;color:var(--ink2);margin-left:8px">создаст запись в справочнике клиентов и переведёт в этап «клиент»</span>
+    </form>
+    {% else %}
+    <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px;font-size:13px;color:var(--grn)">
+      <i class="ti ti-circle-check-filled"></i> Уже в справочнике клиентов — <a href="{% url 'client_card' lead.company %}" class="link">открыть карточку клиента →</a>
+    </div>
+    {% endif %}
   </div>
 
   <div class="card">
@@ -54,6 +68,7 @@
       <li><span class="nm">Ответственный</span><span class="vl">{{ lead.owner|default:"—" }}</span></li>
       <li><span class="nm">Источник</span><span class="vl">{{ lead.source|default:"—" }}</span></li>
       <li><span class="nm">Последний контакт</span><span class="vl">{{ lead.last_touch|date:"d.m.Y"|default:"—" }}</span></li>
+      <li><span class="nm">Следующий шаг</span><span class="vl">{{ lead.next_action|date:"d.m.Y"|default:"—" }}</span></li>
       <li><span class="nm">Создан</span><span class="vl">{{ lead.created_at|date:"d.m.Y" }}</span></li>
       <li><span class="nm">Обновлён</span><span class="vl">{{ lead.updated_at|date:"d.m.Y H:i" }}</span></li>
     </ul>
@@ -65,5 +80,29 @@
       </form>
     </div>
   </div>
+</div>
+
+<div class="card wide" style="margin-top:14px">
+  <div class="ch"><span>История и активности</span><small>звонки, письма, встречи, договорённости</small></div>
+  <form method="post" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">{% csrf_token %}
+    <input type="hidden" name="action" value="note">
+    <div class="frow" style="flex:1;min-width:280px"><label>Добавить запись</label>
+      <input name="text" placeholder="напр. созвонились, ждут КП до пятницы" required
+        style="font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%"></div>
+    <button class="btn" type="submit">Записать</button>
+  </form>
+  {% if notes %}
+  <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">
+    {% for n in notes %}
+    <li style="display:flex;gap:11px;align-items:flex-start">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--pu);flex:none;margin-top:6px"></span>
+      <div>
+        <div style="font-size:13px">{{ n.text }}</div>
+        <div style="font-size:11px;color:var(--ink2);margin-top:2px">{{ n.created_at|date:"d.m.Y H:i" }}{% if n.author %} · {{ n.author }}{% endif %}</div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<div class="foot">Пока нет записей. Веди историю касаний — так видно, на каком шаге лид и что обещали.</div>{% endif %}
 </div>
 {% endblock %}

@@ -55,6 +55,12 @@
     </div>
     {% if not can_edit %}</fieldset>{% endif %}
   </form>
+  {% if user.is_staff %}
+  <form method="post" onsubmit="return confirm('Удалить клиента «{{ p.name|escapejs }}» из справочника? Действие необратимо.')" style="margin-top:10px">{% csrf_token %}
+    <input type="hidden" name="action" value="delete">
+    <button type="submit" style="background:none;border:0;color:var(--redb);cursor:pointer;font:inherit;font-size:12px;padding:0">Удалить клиента из справочника</button>
+  </form>
+  {% endif %}
 
   <!-- ПРАВО: АНАЛИТИКА -->
   <div style="display:flex;flex-direction:column;gap:14px">

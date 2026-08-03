@@ -8,10 +8,11 @@
   <div class="ch"><span>Этапы воронки</span><small>колонки на канбан-доске · порядок слева направо по числу</small></div>
   <form method="post" id="savef">{% csrf_token %}<input type="hidden" name="action" value="save">
     <table>
-      <thead><tr><th>Название этапа</th><th style="width:90px">Порядок</th><th style="width:110px">Успех</th><th style="width:90px">Отказ</th><th style="width:90px"></th></tr></thead>
+      <thead><tr><th>Цвет</th><th>Название этапа</th><th style="width:90px">Порядок</th><th style="width:110px">Успех</th><th style="width:90px">Отказ</th><th style="width:90px"></th></tr></thead>
       <tbody>
         {% for s in stages %}
         <tr>
+          <td><input name="color_{{ s.id }}" type="color" value="{{ s.color }}" style="width:40px;height:32px;border:1px solid var(--line);border-radius:8px;padding:2px;cursor:pointer;background:var(--sf)"></td>
           <td><input name="name_{{ s.id }}" value="{{ s.name }}" style="width:100%;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px"></td>
           <td><input name="order_{{ s.id }}" type="number" value="{{ s.order }}" style="width:70px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px"></td>
           <td><label style="font-size:12px;color:var(--ink2)"><input type="checkbox" name="won_{{ s.id }}" {% if s.is_won %}checked{% endif %}> клиент</label></td>

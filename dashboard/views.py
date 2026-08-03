@@ -425,6 +425,10 @@ def client_card(request, client):
     prof = ManagerProfile.objects.filter(user=request.user).first()
     can_edit = bool(request.user.is_staff or (prof and prof.manager and prof.manager == p['owner_manager']))
     saved = False
+    if request.method == 'POST' and request.POST.get('action') == 'delete' and request.user.is_staff:
+        from django.shortcuts import redirect
+        Client.objects.filter(name=client).delete()
+        return redirect('clients')
     if request.method == 'POST' and can_edit:
         obj, _ = Client.objects.get_or_create(name=client)
         for f in ('channel', 'status', 'full_name', 'kpp', 'ogrn', 'phone', 'contact', 'email',
@@ -633,12 +637,16 @@ def leads(request):
         _lead_add_from_post(request)
         return redirect('leads')
     rows, sel_channel = _lead_filter(request)
+    today = date.today()
+    for r in rows:
+        r.overdue = bool(r.next_action and r.next_action < today
+                         and not (r.stage and (r.stage.is_won or r.stage.is_lost)))
     stages = list(LeadStage.objects.all())
     default_id = stages[0].id if stages else None
     cols = []
     for st in stages:
         items = [r for r in rows if r.stage_id == st.id or (r.stage_id is None and st.id == default_id)]
-        cols.append({'id': st.id, 'name': st.name, 'is_won': st.is_won, 'is_lost': st.is_lost,
+        cols.append({'id': st.id, 'name': st.name, 'color': st.color, 'is_won': st.is_won, 'is_lost': st.is_lost,
                      'items': items, 'n': len(items), 'sum': sum(r.potential or 0 for r in items)})
     return render(request, 'dashboard/leads_board.html', {
         'page': 'leads', 'cols': cols, 'stages': stages, 'total': len(rows),
@@ -706,8 +714,11 @@ def lead_stages(request):
             for st in LeadStage.objects.all():
                 nm = (request.POST.get('name_%d' % st.id) or '').strip()
                 od = _to_int(request.POST.get('order_%d' % st.id))
+                cl = (request.POST.get('color_%d' % st.id) or '').strip()
                 st.name = nm or st.name
                 st.order = od if od is not None else st.order
+                if cl:
+                    st.color = cl
                 st.is_won = request.POST.get('won_%d' % st.id) == 'on'
                 st.is_lost = request.POST.get('lost_%d' % st.id) == 'on'
                 st.save()
@@ -720,28 +731,65 @@ def lead_stages(request):
     return render(request, 'dashboard/lead_stages.html', {'page': 'leads', 'stages': stages})
 
 
+def _convert_lead_to_client(lead, user):
+    """Закрытие цикла: завести лид клиентом в справочник."""
+    from .models import Client, LeadStage, LeadNote
+    obj, _created = Client.objects.get_or_create(name=lead.company.strip())
+    if lead.inn and not obj.inn:
+        obj.inn = lead.inn
+    if lead.city and not obj.city:
+        obj.city = lead.city
+    if lead.phone and not obj.phone:
+        obj.phone = lead.phone
+    if lead.email and not obj.email:
+        obj.email = lead.email
+    if lead.contact and not obj.contact:
+        obj.contact = lead.contact
+    if lead.channel and not obj.channel:
+        obj.channel = lead.channel
+    obj.save()
+    lead.converted = True
+    won = LeadStage.objects.filter(is_won=True).order_by('order').first()
+    if won:
+        lead.stage = won
+    lead.save()
+    LeadNote.objects.create(lead=lead, text='✅ Заведён в справочник клиентов',
+                            author=(user.get_username() if user else ''))
+    return obj
+
+
 @login_required
 def lead_card(request, lead_id):
     from django.shortcuts import redirect, get_object_or_404
-    from .models import Lead, LeadStage
+    from .models import Lead, LeadStage, LeadNote
     lead = get_object_or_404(Lead, id=lead_id)
-    saved = False
+    saved = converted = False
     if request.method == 'POST':
-        if request.POST.get('action') == 'delete':
+        act = request.POST.get('action')
+        if act == 'delete':
             lead.delete()
             return redirect('leads')
+        if act == 'note':
+            txt = (request.POST.get('text') or '').strip()
+            if txt:
+                LeadNote.objects.create(lead=lead, text=txt, author=request.user.get_username())
+            return redirect('lead_card', lead_id=lead.id)
+        if act == 'convert':
+            _convert_lead_to_client(lead, request.user)
+            return redirect('lead_card', lead_id=lead.id)
         for fld in ('company', 'inn', 'channel', 'city', 'contact', 'phone', 'email',
                     'website', 'source', 'owner', 'note'):
             setattr(lead, fld, (request.POST.get(fld) or '').strip())
         lead.stage = _stage_by_id(request.POST.get('stage')) or lead.stage
         lead.potential = _to_int(request.POST.get('potential'))
-        lt = (request.POST.get('last_touch') or '').strip()
-        if lt:
-            lead.last_touch = _pdate(lt)
+        lead.last_touch = _pdate((request.POST.get('last_touch') or '').strip())
+        lead.next_action = _pdate((request.POST.get('next_action') or '').strip())
         lead.save()
         saved = True
+    from .models import Client
     return render(request, 'dashboard/lead_card.html', {
-        'page': 'leads', 'lead': lead, 'saved': saved,
+        'page': 'leads', 'lead': lead, 'saved': saved, 'converted': converted,
+        'notes': list(lead.notes.all()), 'is_client': Client.objects.filter(name=lead.company).exists(),
         'channels': Lead.CHANNELS, 'stages': list(LeadStage.objects.all())})
 
 
