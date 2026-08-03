@@ -504,5 +504,167 @@ def upakovka(request):
     })
 
 
+# ---------- Лиды / потенциальные клиенты ----------
+_LEAD_HMAP = {
+    'компания': 'company', 'название': 'company', 'наименование': 'company', 'company': 'company', 'контрагент': 'company',
+    'инн': 'inn', 'inn': 'inn',
+    'канал': 'channel', 'channel': 'channel',
+    'город': 'city', 'city': 'city',
+    'контакт': 'contact', 'контактное лицо': 'contact', 'фио': 'contact', 'contact': 'contact', 'лицо': 'contact',
+    'телефон': 'phone', 'тел': 'phone', 'phone': 'phone', 'моб': 'phone',
+    'email': 'email', 'почта': 'email', 'e-mail': 'email', 'мейл': 'email', 'емейл': 'email',
+    'сайт': 'website', 'website': 'website', 'url': 'website',
+    'источник': 'source', 'source': 'source', 'откуда': 'source',
+    'статус': 'status', 'status': 'status',
+    'ответственный': 'owner', 'менеджер': 'owner', 'owner': 'owner',
+    'заметки': 'note', 'заметка': 'note', 'комментарий': 'note', 'note': 'note', 'коммент': 'note',
+}
+
+
+def _parse_leads_file(f):
+    """Читает xlsx/csv с лидами → список dict. Заголовки распознаются гибко (рус/eng)."""
+    from .models import Lead
+    ch_map = {l.lower(): c for c, l in Lead.CHANNELS}
+    ch_map.update({c: c for c, _ in Lead.CHANNELS})
+    st_map = {l.lower(): c for c, l in Lead.STATUS}
+    st_map.update({c: c for c, _ in Lead.STATUS})
+    name = (getattr(f, 'name', '') or '').lower()
+    if name.endswith('.csv'):
+        import io
+        import csv
+        raw = f.read()
+        text = None
+        for enc in ('utf-8-sig', 'cp1251', 'utf-8'):
+            try:
+                text = raw.decode(enc)
+                break
+            except (UnicodeDecodeError, AttributeError):
+                text = None
+        if text is None:
+            text = raw.decode('utf-8', 'ignore')
+        delim = ';' if text.count(';') > text.count(',') else ','
+        table = [list(r) for r in csv.reader(io.StringIO(text), delimiter=delim)]
+    else:
+        import io
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(f.read()), read_only=True, data_only=True)
+        ws = wb.active
+        table = [[('' if c is None else c) for c in row] for row in ws.iter_rows(values_only=True)]
+    table = [r for r in table if any(str(c).strip() for c in r)]
+    if not table:
+        return []
+    headers = [str(h or '').strip().lower() for h in table[0]]
+    idx = {}
+    for i, h in enumerate(headers):
+        fld = _LEAD_HMAP.get(h)
+        if fld and fld not in idx:
+            idx[fld] = i
+    if 'company' not in idx:               # нет шапки → первый столбец = компания
+        idx = {'company': 0}
+        data = table
+    else:
+        data = table[1:]
+    out = []
+    for row in data:
+        def g(k):
+            i = idx.get(k)
+            return str(row[i]).strip() if (i is not None and i < len(row) and row[i] is not None) else ''
+        rec = {k: g(k) for k in ('company', 'inn', 'city', 'contact', 'phone', 'email', 'website', 'source', 'owner', 'note')}
+        rec['channel'] = ch_map.get(g('channel').lower(), '')
+        rec['status'] = st_map.get(g('status').lower(), '')
+        if rec['company']:
+            out.append(rec)
+    return out
+
+
+@login_required
+def leads(request):
+    from django.shortcuts import redirect
+    from .models import Lead
+    if request.method == 'POST' and request.POST.get('action') == 'add':
+        comp = (request.POST.get('company') or '').strip()
+        if comp:
+            Lead.objects.create(
+                company=comp, inn=(request.POST.get('inn') or '').strip(),
+                channel=request.POST.get('channel') or '', city=(request.POST.get('city') or '').strip(),
+                contact=(request.POST.get('contact') or '').strip(), phone=(request.POST.get('phone') or '').strip(),
+                email=(request.POST.get('email') or '').strip(), website=(request.POST.get('website') or '').strip(),
+                source=(request.POST.get('source') or '').strip(), owner=(request.POST.get('owner') or '').strip(),
+                status=request.POST.get('status') or 'new')
+        return redirect('leads')
+    q = (request.GET.get('q') or '').strip().lower()
+    sel_status = request.GET.get('status') or ''
+    sel_channel = request.GET.get('channel') or ''
+    all_rows = list(Lead.objects.all())
+    counts = {k: 0 for k, _ in Lead.STATUS}
+    for r in all_rows:
+        counts[r.status] = counts.get(r.status, 0) + 1
+    funnel = [{'code': k, 'label': v, 'n': counts.get(k, 0)} for k, v in Lead.STATUS]
+    rows = all_rows
+    if sel_status:
+        rows = [r for r in rows if r.status == sel_status]
+    if sel_channel:
+        rows = [r for r in rows if r.channel == sel_channel]
+    if q:
+        rows = [r for r in rows if q in r.company.lower() or q in (r.inn or '') or q in (r.city or '').lower()]
+    return render(request, 'dashboard/leads.html', {
+        'page': 'leads', 'rows': rows, 'funnel': funnel, 'total': len(all_rows), 'found': len(rows),
+        'sel_status': sel_status, 'sel_channel': sel_channel, 'q': request.GET.get('q', ''),
+        'channels': Lead.CHANNELS, 'statuses': Lead.STATUS,
+        'won': counts.get('won', 0), 'active': len(all_rows) - counts.get('won', 0) - counts.get('lost', 0)})
+
+
+@login_required
+def lead_card(request, lead_id):
+    from django.shortcuts import redirect, get_object_or_404
+    from .models import Lead
+    lead = get_object_or_404(Lead, id=lead_id)
+    saved = False
+    if request.method == 'POST':
+        if request.POST.get('action') == 'delete':
+            lead.delete()
+            return redirect('leads')
+        for fld in ('company', 'inn', 'channel', 'city', 'contact', 'phone', 'email',
+                    'website', 'source', 'owner', 'status', 'note'):
+            setattr(lead, fld, (request.POST.get(fld) or '').strip())
+        lt = (request.POST.get('last_touch') or '').strip()
+        if lt:
+            lead.last_touch = _pdate(lt)
+        lead.save()
+        saved = True
+    return render(request, 'dashboard/lead_card.html', {
+        'page': 'leads', 'lead': lead, 'saved': saved,
+        'channels': Lead.CHANNELS, 'statuses': Lead.STATUS})
+
+
+@login_required
+def lead_import(request):
+    from .models import Lead
+    result = None
+    if request.method == 'POST' and request.FILES.get('file'):
+        try:
+            parsed = _parse_leads_file(request.FILES['file'])
+        except Exception as e:
+            return render(request, 'dashboard/lead_import.html', {'page': 'leads', 'error': str(e)})
+        existing_inn = set(x for x in Lead.objects.exclude(inn='').values_list('inn', flat=True))
+        existing_names = {c.lower() for c in Lead.objects.values_list('company', flat=True)}
+        created = skipped = 0
+        for r in parsed:
+            inn = r['inn']
+            if (inn and inn in existing_inn) or r['company'].lower() in existing_names:
+                skipped += 1
+                continue
+            Lead.objects.create(
+                company=r['company'], inn=inn, channel=r['channel'], city=r['city'],
+                contact=r['contact'], phone=r['phone'], email=r['email'], website=r['website'],
+                source=r['source'] or 'импорт', owner=r['owner'], status=r['status'] or 'new', note=r['note'])
+            if inn:
+                existing_inn.add(inn)
+            existing_names.add(r['company'].lower())
+            created += 1
+        result = {'created': created, 'skipped': skipped, 'total': len(parsed)}
+    return render(request, 'dashboard/lead_import.html', {'page': 'leads', 'result': result})
+
+
 class Login(LoginView):
     template_name = 'dashboard/login.html'

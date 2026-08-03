@@ -1,0 +1,37 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Импорт лидов{% endblock %}
+{% block content %}
+
+<div style="margin-bottom:12px"><a href="{% url 'leads' %}" class="link">← ко всем лидам</a></div>
+
+{% if result %}
+<div class="card wide" style="margin-bottom:14px;border-color:var(--grn)">
+  <div class="ch"><span>Импорт завершён</span></div>
+  <ul class="rows">
+    <li><span class="nm">Добавлено новых</span><span class="vl"><b style="color:var(--grn)">{{ result.created }}</b></span></li>
+    <li><span class="nm">Пропущено (дубли по ИНН/названию)</span><span class="vl">{{ result.skipped }}</span></li>
+    <li><span class="nm">Всего строк в файле</span><span class="vl">{{ result.total }}</span></li>
+  </ul>
+  <div class="foot"><a href="{% url 'leads' %}" class="link">Смотреть лиды →</a></div>
+</div>
+{% endif %}
+{% if error %}<div class="warnbox">Не удалось разобрать файл: {{ error }}</div>{% endif %}
+
+<div class="card wide">
+  <div class="ch"><span>Импорт лидов из Excel / CSV</span></div>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <div class="frow" style="max-width:420px"><label>Файл (.xlsx или .csv)</label>
+      <input type="file" name="file" accept=".xlsx,.csv" required
+        style="font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--sf)"></div>
+    <div style="margin-top:12px"><button class="btn" type="submit">Загрузить</button></div>
+  </form>
+  <div class="foot" style="line-height:1.7">
+    <b>Формат колонок</b> (первая строка — заголовки, порядок любой, лишние колонки игнорируются):<br>
+    <code>Компания</code> (обязательна) · <code>ИНН</code> · <code>Канал</code> · <code>Город</code> · <code>Контакт</code> ·
+    <code>Телефон</code> · <code>Email</code> · <code>Сайт</code> · <code>Источник</code> · <code>Статус</code> · <code>Ответственный</code> · <code>Заметки</code><br>
+    <b>Канал:</b> сети · зож · e-com · horeca · опт · стм · прочее (можно и полным названием).<br>
+    <b>Статус:</b> новый · написали · ответил · переговоры · стал клиентом · отказ (пусто = новый).<br>
+    Дубли по ИНН или названию компании не добавляются повторно. Если хочешь, я готовлю списки лидов прямо в этом формате — просто выгружаешь и загружаешь сюда.
+  </div>
+</div>
+{% endblock %}

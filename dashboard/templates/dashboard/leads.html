@@ -1,0 +1,76 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Лиды{% endblock %}
+{% block content %}
+
+<section class="kpis" style="grid-template-columns:repeat(6,1fr)">
+  {% for s in funnel %}
+  <a href="?status={{ s.code }}{% if sel_channel %}&channel={{ sel_channel }}{% endif %}" class="kpi {% if sel_status == s.code %}hero{% endif %}" style="text-decoration:none">
+    <div class="kl">{{ s.label }}</div>
+    <div class="kv">{{ s.n }}</div>
+  </a>
+  {% endfor %}
+</section>
+
+<div class="filters" style="margin:0 0 14px">
+  <form method="get" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input type="text" name="q" value="{{ q }}" placeholder="поиск: компания / ИНН / город"
+      style="font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:230px">
+    <select name="channel" onchange="this.form.submit()"><option value="">Канал: все</option>
+      {% for c,l in channels %}<option value="{{ c }}" {% if c == sel_channel %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+    {% if sel_status %}<input type="hidden" name="status" value="{{ sel_status }}">{% endif %}
+    <button class="btn" type="submit">Найти</button>
+    {% if q or sel_channel or sel_status %}<a href="?" class="clearf">сбросить</a>{% endif %}
+  </form>
+  <span style="flex:1"></span>
+  <a href="{% url 'lead_import' %}" class="perbtn"><i class="ti ti-file-spreadsheet"></i> Импорт Excel</a>
+  <button class="btn" type="button" onclick="var d=document.getElementById('addlead');d.open=!d.open">+ Лид</button>
+</div>
+
+<details id="addlead" class="card wide" style="margin-bottom:14px">
+  <summary style="cursor:pointer;font-weight:600;font-size:13px">Добавить лид вручную</summary>
+  <form method="post" style="margin-top:12px">{% csrf_token %}<input type="hidden" name="action" value="add">
+    <div class="cform"><div class="two">
+      <div class="frow"><label>Компания *</label><input name="company" required></div>
+      <div class="frow"><label>ИНН</label><input name="inn"></div>
+      <div class="frow"><label>Канал</label><select name="channel"><option value="">—</option>{% for c,l in channels %}<option value="{{ c }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="frow"><label>Город</label><input name="city"></div>
+      <div class="frow"><label>Контактное лицо</label><input name="contact"></div>
+      <div class="frow"><label>Телефон</label><input name="phone"></div>
+      <div class="frow"><label>Email</label><input name="email"></div>
+      <div class="frow"><label>Сайт</label><input name="website"></div>
+      <div class="frow"><label>Источник</label><input name="source" placeholder="веб-поиск, выставка…"></div>
+      <div class="frow"><label>Ответственный</label><input name="owner"></div>
+    </div>
+    <div style="margin-top:12px"><button class="btn" type="submit">Добавить лид</button></div>
+    </div>
+  </form>
+</details>
+
+<div class="card wide">
+  <div class="ch">
+    <span>Лиды {% if sel_status or sel_channel or q %}· найдено {{ found }}{% else %}· всего {{ total }}{% endif %}</span>
+    <small>{{ active }} в работе · {{ won }} стали клиентами</small>
+  </div>
+  {% if rows %}
+  <table>
+    <thead><tr><th>Компания</th><th>Канал</th><th>Город</th><th>Контакт</th><th>Статус</th><th>Обновлён</th></tr></thead>
+    <tbody>
+      {% for r in rows %}<tr onclick="location.href='{% url 'lead_card' r.id %}'">
+        <td>{{ r.company }}{% if r.inn %}<div style="font-size:11px;color:var(--ink2)">ИНН {{ r.inn }}</div>{% endif %}</td>
+        <td>{{ r.get_channel_display|default:"—" }}</td>
+        <td>{{ r.city|default:"—" }}</td>
+        <td>{{ r.contact }}{% if r.phone %} · {{ r.phone }}{% endif %}</td>
+        <td>
+          {% if r.status == 'won' %}<span class="pill" style="background:rgba(47,168,79,.14);color:var(--grn)">{{ r.get_status_display }}</span>
+          {% elif r.status == 'lost' %}<span class="pill red">{{ r.get_status_display }}</span>
+          {% elif r.status == 'negotiation' %}<span class="pill amb">{{ r.get_status_display }}</span>
+          {% else %}<span class="pill">{{ r.get_status_display }}</span>{% endif %}
+        </td>
+        <td>{{ r.updated_at|date:"d.m.Y" }}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="foot">Клик по строке — карточка лида. Воронка сверху кликабельна: фильтрует по этапу. Всё хранится в базе ERP.</div>
+  {% else %}<div class="foot">Пока нет лидов под этот фильтр. Добавь вручную (кнопка «+ Лид») или <a href="{% url 'lead_import' %}" class="link">импортни из Excel →</a></div>{% endif %}
+</div>
+{% endblock %}

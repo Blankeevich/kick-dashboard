@@ -291,6 +291,51 @@ class CostSku(models.Model):
         return self.sku
 
 
+class Lead(models.Model):
+    """Потенциальный клиент (лид) с воронкой продаж."""
+    STATUS = [
+        ('new', 'Новый'),
+        ('contacted', 'Написали'),
+        ('replied', 'Ответил'),
+        ('negotiation', 'Переговоры'),
+        ('won', 'Стал клиентом'),
+        ('lost', 'Отказ'),
+    ]
+    CHANNELS = [
+        ('сети', 'Сетевой ритейл'),
+        ('зож', 'ЗОЖ-розница'),
+        ('e-com', 'E-com / маркетплейс'),
+        ('horeca', 'HoReCa'),
+        ('опт', 'Опт / дистрибуция'),
+        ('стм', 'СТМ / контракт'),
+        ('прочее', 'Прочее'),
+    ]
+    company = models.CharField('Компания', max_length=255, db_index=True)
+    inn = models.CharField('ИНН', max_length=15, blank=True, db_index=True)
+    channel = models.CharField('Канал', max_length=20, choices=CHANNELS, blank=True)
+    city = models.CharField('Город', max_length=120, blank=True)
+    contact = models.CharField('Контактное лицо', max_length=160, blank=True)
+    phone = models.CharField('Телефон', max_length=80, blank=True)
+    email = models.CharField('Email', max_length=160, blank=True)
+    website = models.CharField('Сайт', max_length=200, blank=True)
+    source = models.CharField('Источник', max_length=160, blank=True,
+                              help_text='Где нашли: веб-поиск, выставка, рекомендация…')
+    status = models.CharField('Статус', max_length=20, choices=STATUS, default='new', db_index=True)
+    owner = models.CharField('Ответственный', max_length=160, blank=True)
+    note = models.TextField('Заметки', blank=True)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+    last_touch = models.DateField('Последний контакт', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Лид'
+        verbose_name_plural = 'Лиды (потенциальные клиенты)'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return self.company
+
+
 class PackagingItem(models.Model):
     """Справочник упаковки: связь с батончиком (для расхода по продажам) + остаток."""
     upak = models.CharField('Упаковка', max_length=255, unique=True)

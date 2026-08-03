@@ -1,0 +1,67 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}{{ lead.company }}{% endblock %}
+{% block content %}
+
+<div style="margin-bottom:12px"><a href="{% url 'leads' %}" class="link">← ко всем лидам</a></div>
+{% if saved %}<div class="card wide" style="margin-bottom:12px;border-color:var(--grn)"><b style="color:var(--grn)">Сохранено</b></div>{% endif %}
+
+<div class="grid">
+  <div class="card">
+    <div class="ch"><span>Карточка лида</span><small>{{ lead.get_status_display }}</small></div>
+    <form method="post">{% csrf_token %}
+      <div class="cform">
+        <div class="frow"><label>Компания</label><input name="company" value="{{ lead.company }}" required></div>
+        <div class="two">
+          <div class="frow"><label>ИНН</label><input name="inn" value="{{ lead.inn }}"></div>
+          <div class="frow"><label>Город</label><input name="city" value="{{ lead.city }}"></div>
+        </div>
+        <div class="two">
+          <div class="frow"><label>Канал</label><select name="channel"><option value="">—</option>
+            {% for c,l in channels %}<option value="{{ c }}" {% if c == lead.channel %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+          <div class="frow"><label>Статус (воронка)</label><select name="status">
+            {% for c,l in statuses %}<option value="{{ c }}" {% if c == lead.status %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+        </div>
+        <div class="sub">Контакты</div>
+        <div class="frow"><label>Контактное лицо</label><input name="contact" value="{{ lead.contact }}"></div>
+        <div class="two">
+          <div class="frow"><label>Телефон</label><input name="phone" value="{{ lead.phone }}"></div>
+          <div class="frow"><label>Email</label><input name="email" value="{{ lead.email }}"></div>
+        </div>
+        <div class="frow"><label>Сайт</label><input name="website" value="{{ lead.website }}"></div>
+        <div class="sub">Прочее</div>
+        <div class="two">
+          <div class="frow"><label>Источник</label><input name="source" value="{{ lead.source }}"></div>
+          <div class="frow"><label>Ответственный</label><input name="owner" value="{{ lead.owner }}"></div>
+        </div>
+        <div class="frow"><label>Последний контакт</label><input type="date" name="last_touch" value="{{ lead.last_touch|date:'Y-m-d' }}"></div>
+        <div class="frow"><label>Заметки</label><textarea name="note" rows="4">{{ lead.note }}</textarea></div>
+        <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+          <button class="btn" type="submit">Сохранить</button>
+          <a href="{% url 'leads' %}" class="link">отмена</a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="ch"><span>Сводка</span></div>
+    <ul class="rows">
+      <li><span class="nm">Статус</span><span class="vl">{{ lead.get_status_display }}</span></li>
+      <li><span class="nm">Канал</span><span class="vl">{{ lead.get_channel_display|default:"—" }}</span></li>
+      <li><span class="nm">Город</span><span class="vl">{{ lead.city|default:"—" }}</span></li>
+      <li><span class="nm">Ответственный</span><span class="vl">{{ lead.owner|default:"—" }}</span></li>
+      <li><span class="nm">Источник</span><span class="vl">{{ lead.source|default:"—" }}</span></li>
+      <li><span class="nm">Последний контакт</span><span class="vl">{{ lead.last_touch|date:"d.m.Y"|default:"—" }}</span></li>
+      <li><span class="nm">Создан</span><span class="vl">{{ lead.created_at|date:"d.m.Y" }}</span></li>
+      <li><span class="nm">Обновлён</span><span class="vl">{{ lead.updated_at|date:"d.m.Y H:i" }}</span></li>
+    </ul>
+    {% if lead.website %}<div class="foot"><a href="{% if '://' in lead.website %}{{ lead.website }}{% else %}https://{{ lead.website }}{% endif %}" target="_blank" rel="noopener" class="link">Открыть сайт →</a></div>{% endif %}
+    <div class="foot">
+      <form method="post" onsubmit="return confirm('Удалить лид {{ lead.company|escapejs }}?')">{% csrf_token %}
+        <input type="hidden" name="action" value="delete">
+        <button type="submit" style="background:none;border:0;color:var(--redb);cursor:pointer;font:inherit;font-size:12px;padding:0">Удалить лид</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
