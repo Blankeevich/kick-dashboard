@@ -37,6 +37,28 @@
   .won-badge{font-size:10px;font-weight:600;color:var(--grn)}
   .bempty{font-size:11.5px;color:var(--ink3);text-align:center;padding:16px 6px}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  /* помойка */
+  .trash{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(24px);opacity:0;pointer-events:none;
+         background:var(--sf);border:1.5px dashed var(--line);color:var(--ink2);border-radius:14px;padding:13px 26px;
+         font-size:13px;font-weight:500;display:flex;align-items:center;gap:9px;box-shadow:var(--sh);z-index:900;
+         transition:opacity .2s var(--ease),transform .2s var(--ease),border-color .15s,background .15s,color .15s}
+  .trash i{font-size:18px}
+  .trash.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+  .trash.over{border-color:var(--redb);color:var(--redb);background:rgba(194,65,12,.07);border-style:solid;
+              transform:translateX(-50%) translateY(0) scale(1.06)}
+  /* модалка быстрого просмотра */
+  .qv-overlay{position:fixed;inset:0;background:rgba(20,20,26,.5);backdrop-filter:blur(3px);
+              display:none;align-items:flex-start;justify-content:center;z-index:1000;padding:56px 16px;
+              opacity:0;transition:opacity .2s var(--ease)}
+  .qv-overlay.on{display:flex;opacity:1}
+  .qv-box{background:var(--sf);border-radius:18px;box-shadow:0 40px 90px -24px rgba(0,0,0,.55);
+          max-width:470px;width:100%;padding:24px 24px 22px;position:relative;max-height:82vh;overflow:auto;
+          transform:translateY(12px) scale(.97);transition:transform .28s var(--ease)}
+  .qv-overlay.on .qv-box{transform:none}
+  .qv-close{position:absolute;top:13px;right:15px;background:none;border:0;font-size:15px;color:var(--ink2);
+            cursor:pointer;line-height:1;padding:4px}
+  .qv-close:hover{color:var(--ink)}
+  body.dark .qv-overlay{background:rgba(0,0,0,.55)}
 </style>
 
 <div class="toolbar">
@@ -85,7 +107,7 @@
     <div class="bbody" data-stage="{{ col.id }}" data-color="{{ col.color }}">
       {% for it in col.items %}
       <div class="lcard" draggable="true" data-id="{{ it.id }}" data-pot="{{ it.potential|default:0 }}"
-           data-url="{% url 'lead_card' it.id %}" onclick="if(!this.classList.contains('drag'))location.href=this.dataset.url">
+           onclick="if(!this.classList.contains('drag'))window.__qvOpen(this.dataset.id)">
         <div class="lc">{{ it.company }}</div>
         {% if it.potential %}<div class="lp">{{ it.potential|intcomma }} ₽</div>{% endif %}
         <div class="lm">
@@ -102,12 +124,30 @@
   {% endfor %}
 </div>
 
+<div class="trash" id="trash"><i class="ti ti-trash"></i> Перетащи сюда, чтобы удалить</div>
+
+<div class="qv-overlay" id="qvmodal" onclick="if(event.target===this)window.__qvClose()">
+  <div class="qv-box"><button class="qv-close" type="button" onclick="window.__qvClose()">✕</button><div id="qvbody"></div></div>
+</div>
+
 <script>
 (function(){
   var board=document.getElementById('board');
   if(!board)return;
   var token=(document.querySelector('input[name=csrfmiddlewaretoken]')||{}).value||'';
-  var dragged=null;
+  var dragged=null, trash=document.getElementById('trash');
+  var modal=document.getElementById('qvmodal'), qvbody=document.getElementById('qvbody');
+
+  // ——— модалка быстрого просмотра ———
+  window.__qvOpen=function(id){
+    qvbody.innerHTML='<div style="padding:30px;text-align:center;color:var(--ink2)">загрузка…</div>';
+    modal.classList.add('on');
+    fetch('/leads/'+id+'/quick/').then(function(r){return r.text();})
+      .then(function(html){qvbody.innerHTML=html;})
+      .catch(function(){qvbody.innerHTML='<div style="padding:20px">Не удалось загрузить</div>';});
+  };
+  window.__qvClose=function(){modal.classList.remove('on');};
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')window.__qvClose();});
   function fmt(n){return Math.round(n).toLocaleString('ru-RU');}
   function recount(body){
     var cards=body.querySelectorAll('.lcard'), sum=0;
@@ -124,10 +164,29 @@
     var c=e.target.closest('.lcard');if(!c)return;
     dragged=c;setTimeout(function(){c.classList.add('drag');},0);
     e.dataTransfer.effectAllowed='move';
+    trash.classList.add('show');
   });
   board.addEventListener('dragend',function(){
     if(dragged){dragged.classList.remove('drag');dragged=null;}
     board.querySelectorAll('.bbody.over').forEach(function(b){b.classList.remove('over');});
+    trash.classList.remove('show');trash.classList.remove('over');
+  });
+
+  // ——— помойка ———
+  trash.addEventListener('dragover',function(e){e.preventDefault();trash.classList.add('over');});
+  trash.addEventListener('dragleave',function(){trash.classList.remove('over');});
+  trash.addEventListener('drop',function(e){
+    e.preventDefault();trash.classList.remove('over');
+    if(!dragged)return;
+    var node=dragged, from=node.parentNode, id=node.getAttribute('data-id');
+    var name=(node.querySelector('.lc')||{}).textContent||'лид';
+    if(!confirm('Удалить лид «'+name.trim()+'»? Действие необратимо.')){return;}
+    node.style.transition='opacity .2s, transform .2s';node.style.opacity='0';node.style.transform='scale(.9)';
+    var fd=new FormData();
+    fetch('/leads/'+id+'/delete/',{method:'POST',headers:{'X-CSRFToken':token},body:fd})
+      .then(function(r){return r.json();})
+      .then(function(d){if(d.ok){node.remove();recount(from);}else{node.style.opacity='';node.style.transform='';alert('Не удалось удалить');}})
+      .catch(function(){node.style.opacity='';node.style.transform='';alert('Ошибка сети');});
   });
   board.querySelectorAll('.bbody').forEach(function(body){
     body.addEventListener('dragover',function(e){e.preventDefault();body.classList.add('over');});

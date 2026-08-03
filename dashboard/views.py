@@ -735,6 +735,50 @@ def lead_stages(request):
     return render(request, 'dashboard/lead_stages.html', {'page': 'leads', 'stages': stages})
 
 
+def _lead_erp(company):
+    """Данные из 1С по компании: продажи по годам + текущий долг. None, если нет."""
+    from .models import SalesFact, DebtClientSnapshot
+    from django.db.models import Sum
+    sales_rows = list(SalesFact.objects.filter(client=company)
+                      .values('year').annotate(a=Sum('amount')).order_by('-year'))
+    dsnap = DebtClientSnapshot.objects.filter(client=company).order_by('-date').first()
+    mgr = (SalesFact.objects.filter(client=company).exclude(manager='')
+           .values_list('manager', flat=True).first())
+    if not (sales_rows or dsnap):
+        return None
+    return {
+        'sales': [{'year': r['year'], 'amount': round(r['a'] or 0)} for r in sales_rows],
+        'debt': round(dsnap.debt_total) if dsnap else 0,
+        'overdue': round(dsnap.debt_overdue) if dsnap else 0,
+        'debt_date': dsnap.date if dsnap else None,
+        'manager': mgr,
+    }
+
+
+@login_required
+def lead_delete(request, lead_id):
+    """Удаление лида (для перетаскивания в «помойку»)."""
+    from django.http import JsonResponse
+    from django.shortcuts import get_object_or_404
+    from .models import Lead
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+    get_object_or_404(Lead, id=lead_id).delete()
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def lead_quick(request, lead_id):
+    """Компактная карточка-превью лида для модалки на доске."""
+    from django.shortcuts import get_object_or_404
+    from .models import Lead, Client
+    lead = get_object_or_404(Lead, id=lead_id)
+    return render(request, 'dashboard/lead_quick.html', {
+        'lead': lead, 'erp': _lead_erp(lead.company),
+        'is_client': Client.objects.filter(name=lead.company).exists(),
+        'notes': list(lead.notes.all()[:4])})
+
+
 def _convert_lead_to_client(lead, user):
     """Закрытие цикла: завести лид клиентом в справочник."""
     from .models import Client, LeadStage, LeadNote
@@ -790,25 +834,9 @@ def lead_card(request, lead_id):
         lead.next_action = _pdate((request.POST.get('next_action') or '').strip())
         lead.save()
         saved = True
-    from .models import Client, SalesFact, DebtClientSnapshot
-    from django.db.models import Sum
+    from .models import Client, SalesManager
     is_client = Client.objects.filter(name=lead.company).exists()
-    # 360°: подтягиваем данные из 1С, если компания есть в продажах/дебиторке
-    sales_rows = list(SalesFact.objects.filter(client=lead.company)
-                      .values('year').annotate(a=Sum('amount')).order_by('-year'))
-    dsnap = DebtClientSnapshot.objects.filter(client=lead.company).order_by('-date').first()
-    mgr = (SalesFact.objects.filter(client=lead.company).exclude(manager='')
-           .values_list('manager', flat=True).first())
-    erp = None
-    if sales_rows or dsnap:
-        erp = {
-            'sales': [{'year': r['year'], 'amount': round(r['a'] or 0)} for r in sales_rows],
-            'debt': round(dsnap.debt_total) if dsnap else 0,
-            'overdue': round(dsnap.debt_overdue) if dsnap else 0,
-            'debt_date': dsnap.date if dsnap else None,
-            'manager': mgr,
-        }
-    from .models import SalesManager
+    erp = _lead_erp(lead.company)   # 360°: данные из 1С, если компания есть в базе
     return render(request, 'dashboard/lead_card.html', {
         'page': 'leads', 'lead': lead, 'saved': saved, 'converted': converted,
         'notes': list(lead.notes.all()), 'is_client': is_client, 'erp': erp,

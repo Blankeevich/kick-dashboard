@@ -1,0 +1,47 @@
+{% load humanize %}
+<div style="font-size:18px;font-weight:600;letter-spacing:-.02em">{{ lead.company }}</div>
+<div style="font-size:12.5px;color:var(--ink2);margin-top:3px">
+  {{ lead.stage.name }}{% if lead.get_channel_display %} · {{ lead.get_channel_display }}{% endif %}{% if lead.city %} · {{ lead.city }}{% endif %}
+</div>
+{% if lead.potential %}<div style="font-size:22px;font-weight:700;color:var(--pu);margin-top:10px;font-variant-numeric:tabular-nums">{{ lead.potential|intcomma }} ₽</div>{% endif %}
+
+<ul class="rows" style="margin-top:12px">
+  {% if lead.contact %}<li><span class="nm">Контакт</span><span class="vl">{{ lead.contact }}</span></li>{% endif %}
+  {% if lead.phone %}<li><span class="nm">Телефон</span><span class="vl">{{ lead.phone }}</span></li>{% endif %}
+  {% if lead.email %}<li><span class="nm">Email</span><span class="vl">{{ lead.email }}</span></li>{% endif %}
+  {% if lead.owner %}<li><span class="nm">Менеджер</span><span class="vl">{{ lead.owner }}</span></li>{% endif %}
+  {% if lead.next_action %}<li><span class="nm">Следующий шаг</span><span class="vl">{{ lead.next_action|date:"d.m.Y" }}</span></li>{% endif %}
+</ul>
+{% if lead.website or lead.socials %}
+<div class="foot" style="line-height:1.8">
+  {% if lead.website %}<a href="{% if '://' in lead.website %}{{ lead.website }}{% else %}https://{{ lead.website }}{% endif %}" target="_blank" rel="noopener" class="link">сайт</a>{% endif %}
+  {% if lead.socials %}<br>{{ lead.socials|urlize|linebreaksbr }}{% endif %}
+</div>
+{% endif %}
+
+{% if erp %}
+<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+  <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Из 1С</div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:13px">
+    <div>
+      {% for s in erp.sales %}<div><b style="font-variant-numeric:tabular-nums">{{ s.amount|intcomma }} ₽</b> <span style="color:var(--ink2)">· {{ s.year }}</span></div>{% endfor %}
+    </div>
+    <div>
+      <div style="color:var(--ink2);font-size:12px">Долг{% if erp.debt_date %} на {{ erp.debt_date|date:"d.m.y" }}{% endif %}</div>
+      <b style="font-variant-numeric:tabular-nums">{{ erp.debt|intcomma }} ₽</b>{% if erp.overdue %} <span style="color:var(--redb);font-size:12px">просрочка {{ erp.overdue|intcomma }}</span>{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if notes %}
+<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+  <div style="font-size:12px;color:var(--ink2);margin-bottom:7px">Последние записи</div>
+  {% for n in notes %}<div style="font-size:12.5px;margin-bottom:6px">{{ n.text }}<span style="color:var(--ink2)"> · {{ n.created_at|date:"d.m.Y" }}</span></div>{% endfor %}
+</div>
+{% endif %}
+
+<div style="margin-top:16px;display:flex;gap:12px;align-items:center">
+  <a href="{% url 'lead_card' lead.id %}" class="btn">Открыть полную карточку</a>
+  {% if is_client %}<a href="{% url 'client_card' lead.company %}" class="link">карточка клиента →</a>{% endif %}
+</div>
