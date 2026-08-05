@@ -233,30 +233,49 @@ def sales_years():
     return sorted(set(SalesFact.objects.values_list('year', flat=True)), reverse=True)
 
 
+def _sku_norm(s):
+    """Ключ SKU без хвоста «, шт» и лишних пробелов — чтобы 2025 и 2026 сходились."""
+    import re
+    s = str(s or '').replace('\xa0', ' ')
+    s = re.sub(r'\s*,?\s*шт\.?\s*$', '', s, flags=re.I)
+    return re.sub(r'\s+', ' ', s).strip()
+
+
 def sku_year_detail(q=''):
-    """Все SKU × годы: объём (шт), выручка, средняя цена продажи за штуку."""
+    """Все SKU × годы: объём (шт), выручка, средняя цена продажи за штуку.
+    Позиции схлопываются по нормализованному имени (без «, шт»)."""
     from collections import defaultdict
     years = sorted(set(SkuFact.objects.values_list('year', flat=True)))
     if not years:
         return {'years': [], 'rows': []}
-    per = defaultdict(lambda: {})
+    per = defaultdict(lambda: defaultdict(lambda: {'amount': 0, 'qty': 0}))
+    disp = {}
     for r in SkuFact.objects.values('sku_raw', 'year').annotate(a=Sum('amount'), qt=Sum('qty')):
         name = r['sku_raw']
         if not name or str(name).strip().startswith(_DOC_PREFIXES):
             continue
-        per[name][r['year']] = {'amount': round(r['a'] or 0), 'qty': int(r['qt'] or 0),
-                                'price': round((r['a'] or 0) / r['qt']) if r['qt'] else 0}
+        clean = _sku_norm(name)
+        key = clean.lower()
+        disp.setdefault(key, clean)
+        cell = per[key][r['year']]
+        cell['amount'] += round(r['a'] or 0)
+        cell['qty'] += int(r['qt'] or 0)
     ql = (q or '').strip().lower()
     rows = []
-    for name, d in per.items():
-        if ql and ql not in name.lower():
+    for key, d in per.items():
+        if ql and ql not in key:
             continue
         cells = []
         for y in years:
             c = d.get(y)
-            cells.append({'year': y, 'amount': c['amount'] if c else 0,
-                          'qty': c['qty'] if c else 0, 'price': c['price'] if c else 0, 'has': bool(c)})
-        rows.append({'name': name, 'cells': cells, 'total': sum(c['amount'] for c in cells)})
+            if c and c['qty']:
+                cells.append({'year': y, 'amount': c['amount'], 'qty': c['qty'],
+                              'price': round(c['amount'] / c['qty']) if c['qty'] else 0, 'has': True})
+            elif c and c['amount']:
+                cells.append({'year': y, 'amount': c['amount'], 'qty': 0, 'price': 0, 'has': True})
+            else:
+                cells.append({'year': y, 'amount': 0, 'qty': 0, 'price': 0, 'has': False})
+        rows.append({'name': disp[key], 'cells': cells, 'total': sum(c['amount'] for c in cells)})
     rows.sort(key=lambda r: -r['total'])
     return {'years': years, 'rows': rows}
 
@@ -293,10 +312,12 @@ def client_year_detail(q=''):
     return {'years': years, 'rows': rows}
 
 
-def _matrix(base_qs, field, years, limit=10, exclude_docs=False):
-    """Топ-сущности (клиент/менеджер/SKU) × годы — матрица выручки."""
+def _matrix(base_qs, field, years, limit=10, exclude_docs=False, norm=None):
+    """Топ-сущности (клиент/менеджер/SKU) × годы — матрица выручки.
+    norm — функция нормализации имени (напр. схлопнуть «, шт» у SKU)."""
     from collections import defaultdict
     per = defaultdict(dict)
+    disp = {}
     qs = base_qs.values(field, 'year').annotate(s=Sum('amount'))
     for r in qs:
         name = r[field]
@@ -304,8 +325,15 @@ def _matrix(base_qs, field, years, limit=10, exclude_docs=False):
             continue
         if exclude_docs and str(name).strip().startswith(_DOC_PREFIXES):
             continue
-        per[name][r['year']] = r['s'] or 0
-    rows = [{'name': k, 'by_year': [v.get(y, 0) for y in years], 'total': sum(v.values())}
+        if norm:
+            clean = norm(name)
+            key = clean.lower()
+            disp.setdefault(key, clean)
+        else:
+            key = name
+            disp.setdefault(key, name)
+        per[key][r['year']] = per[key].get(r['year'], 0) + (r['s'] or 0)
+    rows = [{'name': disp[k], 'by_year': [v.get(y, 0) for y in years], 'total': sum(v.values())}
             for k, v in per.items()]
     rows.sort(key=lambda r: -r['total'])
     return rows[:limit]
@@ -808,7 +836,7 @@ def year_overview():
     # топы × годы
     top_clients_m = _matrix(sales_qs, 'client', years, 8)
     top_managers_m = _matrix(sales_qs, 'manager', years, 8)
-    top_sku_m = _matrix(SkuFact.objects.all(), 'sku_raw', years, 8, exclude_docs=True)
+    top_sku_m = _matrix(SkuFact.objects.all(), 'sku_raw', years, 8, exclude_docs=True, norm=_sku_norm)
 
     # концентрация: доля топ-5 клиентов в каждом году
     conc = []
