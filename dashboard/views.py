@@ -335,28 +335,45 @@ def signals(request):
 
 @login_required
 def sravnenie(request):
+    import json
     ov = metrics.year_overview()
+    chart_json = '{}'
+    palette = ['#9aa0aa', '#3b82f6', '#6d5bd0', '#2fa84f', '#f59e0b']
     if ov.get('years'):
-        gmax = max((max(v) for v in ov['monthly'].values()), default=1) or 1
-        palette = ['#d7cdec', '#b7a2e0', '#9670d0', '#783CBD', '#5a2c90']
-        W, H = 720, 200
-        lines = []
-        for idx, y in enumerate(ov['years']):
-            pts = []
-            for mi in range(12):
-                x = round(mi / 11 * (W - 20) + 10)
-                yy = round(H - (ov['monthly'][y][mi] / gmax) * (H - 24) - 10)
-                pts.append(f'{x},{yy}')
-            lines.append({'year': y, 'points': ' '.join(pts),
-                          'color': palette[idx % len(palette)]})
-        ov['lines'] = lines
-        ov['svg_w'], ov['svg_h'] = W, H
+        for i, r in enumerate(ov['revenue']):
+            pass
+        chart = {
+            'years': [str(y) for y in ov['years']],
+            'months': MONTHS,
+            'colors': {str(y): palette[i % len(palette)] for i, y in enumerate(ov['years'])},
+            'monthly': {str(y): [round(v) for v in ov['monthly'][y]] for y in ov['years']},
+        }
+        chart_json = json.dumps(chart, ensure_ascii=False)
         rmax = max((r['total'] for r in ov['revenue']), default=1) or 1
         for r in ov['revenue']:
             r['h'] = round(r['total'] / rmax * 100)
     forgotten_n = len(metrics.forgotten_clients(CUR_YEAR)) if ov.get('years') else 0
     return render(request, 'dashboard/sravnenie.html', {'page': 'sravnenie', 'ov': ov,
-                  'months': MONTHS, 'forgotten_n': forgotten_n, 'cur_year': CUR_YEAR})
+                  'months': MONTHS, 'forgotten_n': forgotten_n, 'cur_year': CUR_YEAR,
+                  'chart_json': chart_json})
+
+
+@login_required
+def sravnenie_sku(request):
+    q = request.GET.get('q', '')
+    data = metrics.sku_year_detail(q)
+    return render(request, 'dashboard/sravnenie_detail.html', {
+        'page': 'sravnenie', 'kind': 'sku', 'title': 'Все SKU по годам',
+        'years': data['years'], 'rows': data['rows'][:400], 'q': q, 'total_rows': len(data['rows'])})
+
+
+@login_required
+def sravnenie_clients(request):
+    q = request.GET.get('q', '')
+    data = metrics.client_year_detail(q)
+    return render(request, 'dashboard/sravnenie_detail.html', {
+        'page': 'sravnenie', 'kind': 'client', 'title': 'Все клиенты по годам',
+        'years': data['years'], 'rows': data['rows'][:400], 'q': q, 'total_rows': len(data['rows'])})
 
 
 @login_required

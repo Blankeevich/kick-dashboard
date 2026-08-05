@@ -233,6 +233,66 @@ def sales_years():
     return sorted(set(SalesFact.objects.values_list('year', flat=True)), reverse=True)
 
 
+def sku_year_detail(q=''):
+    """Все SKU × годы: объём (шт), выручка, средняя цена продажи за штуку."""
+    from collections import defaultdict
+    years = sorted(set(SkuFact.objects.values_list('year', flat=True)))
+    if not years:
+        return {'years': [], 'rows': []}
+    per = defaultdict(lambda: {})
+    for r in SkuFact.objects.values('sku_raw', 'year').annotate(a=Sum('amount'), qt=Sum('qty')):
+        name = r['sku_raw']
+        if not name or str(name).strip().startswith(_DOC_PREFIXES):
+            continue
+        per[name][r['year']] = {'amount': round(r['a'] or 0), 'qty': int(r['qt'] or 0),
+                                'price': round((r['a'] or 0) / r['qt']) if r['qt'] else 0}
+    ql = (q or '').strip().lower()
+    rows = []
+    for name, d in per.items():
+        if ql and ql not in name.lower():
+            continue
+        cells = []
+        for y in years:
+            c = d.get(y)
+            cells.append({'year': y, 'amount': c['amount'] if c else 0,
+                          'qty': c['qty'] if c else 0, 'price': c['price'] if c else 0, 'has': bool(c)})
+        rows.append({'name': name, 'cells': cells, 'total': sum(c['amount'] for c in cells)})
+    rows.sort(key=lambda r: -r['total'])
+    return {'years': years, 'rows': rows}
+
+
+def client_year_detail(q=''):
+    """Все клиенты × годы: выручка, объём (шт), число отгрузок, средний чек."""
+    from collections import defaultdict
+    from django.db.models import Count
+    excl = _excluded()
+    years = sorted(set(SalesFact.objects.values_list('year', flat=True)))
+    if not years:
+        return {'years': [], 'rows': []}
+    per = defaultdict(lambda: {})
+    for r in (SalesFact.objects.exclude(client__in=excl).values('client', 'year')
+              .annotate(a=Sum('amount'), qt=Sum('qty'), n=Count('doc_no', distinct=True))):
+        name = r['client']
+        if not name:
+            continue
+        orders = r['n'] or 0
+        per[name][r['year']] = {'amount': round(r['a'] or 0), 'qty': int(r['qt'] or 0),
+                                'orders': orders, 'check': round((r['a'] or 0) / orders) if orders else 0}
+    ql = (q or '').strip().lower()
+    rows = []
+    for name, d in per.items():
+        if ql and ql not in name.lower():
+            continue
+        cells = []
+        for y in years:
+            c = d.get(y)
+            cells.append({'year': y, 'amount': c['amount'] if c else 0, 'qty': c['qty'] if c else 0,
+                          'orders': c['orders'] if c else 0, 'check': c['check'] if c else 0, 'has': bool(c)})
+        rows.append({'name': name, 'cells': cells, 'total': sum(c['amount'] for c in cells)})
+    rows.sort(key=lambda r: -r['total'])
+    return {'years': years, 'rows': rows}
+
+
 def _matrix(base_qs, field, years, limit=10, exclude_docs=False):
     """Топ-сущности (клиент/менеджер/SKU) × годы — матрица выручки."""
     from collections import defaultdict

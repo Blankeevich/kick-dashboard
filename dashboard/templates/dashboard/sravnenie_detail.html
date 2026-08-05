@@ -1,0 +1,61 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div style="margin-bottom:12px"><a href="{% url 'sravnenie' %}" class="link">← к сравнению по годам</a></div>
+
+<div class="filters" style="margin:0 0 14px">
+  <form method="get" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input type="text" name="q" value="{{ q }}" placeholder="поиск по названию" style="min-width:260px">
+    <button class="btn" type="submit">Найти</button>
+    {% if q %}<a href="?" class="clearf">сбросить</a>{% endif %}
+  </form>
+</div>
+
+<div class="card wide">
+  <div class="ch">
+    <span>{{ title }}</span>
+    <small>{% if q %}найдено {{ rows|length }}{% else %}показаны топ-{{ rows|length }} из {{ total_rows }}{% endif %} · сортировка по суммарной выручке</small>
+  </div>
+  {% if rows %}
+  <div style="overflow-x:auto">
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2" style="vertical-align:bottom">{% if kind == 'sku' %}Позиция (SKU){% else %}Клиент{% endif %}</th>
+        {% for y in years %}<th colspan="3" style="text-align:center;border-left:1px solid var(--line)">{{ y }}</th>{% endfor %}
+      </tr>
+      <tr>
+        {% for y in years %}
+          {% if kind == 'sku' %}
+          <th style="border-left:1px solid var(--line)">Объём, шт</th><th>Ср.цена</th><th>Выручка</th>
+          {% else %}
+          <th style="border-left:1px solid var(--line)">Выручка</th><th>Объём, шт</th><th>Ср.чек</th>
+          {% endif %}
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}<tr>
+        <td>{{ r.name }}</td>
+        {% for c in r.cells %}
+          {% if kind == 'sku' %}
+          <td style="border-left:1px solid var(--line)">{% if c.has %}{{ c.qty|intcomma }}{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>
+          <td>{% if c.has %}{{ c.price|intcomma }} ₽{% else %}—{% endif %}</td>
+          <td>{% if c.has %}{{ c.amount|intcomma }} ₽{% else %}—{% endif %}</td>
+          {% else %}
+          <td style="border-left:1px solid var(--line)">{% if c.has %}{{ c.amount|intcomma }} ₽{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>
+          <td>{% if c.has %}{{ c.qty|intcomma }}{% else %}—{% endif %}</td>
+          <td>{% if c.has %}{{ c.check|intcomma }} ₽{% else %}—{% endif %}</td>
+          {% endif %}
+        {% endfor %}
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="foot">
+    {% if kind == 'sku' %}По каждому SKU за каждый год: сколько штук продано, средняя цена продажи (с НДС) и выручка. Видно, где цена растёт/падает и где проседает объём.
+    {% else %}По каждому клиенту за каждый год: выручка, объём в штуках и средний чек (выручка ÷ число отгрузок). Видно, кто вырос, кто просел, у кого поменялся средний заказ.{% endif %}
+  </div>
+  {% else %}<div class="foot">Ничего не найдено{% if q %} по запросу «{{ q }}»{% endif %}.</div>{% endif %}
+</div>
+{% endblock %}

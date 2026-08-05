@@ -16,23 +16,26 @@
   {% endfor %}
 </section>
 
-<!-- СЕЗОННОСТЬ: линии по годам -->
+<!-- СЕЗОННОСТЬ: интерактивный график -->
 <div class="card wide">
   <div class="ch"><span>Помесячная динамика по годам</span>
-    <span style="font-size:11px;color:var(--ink2)">{% for l in ov.lines %}<span style="color:{{ l.color }}">●</span> {{ l.year }}&nbsp;&nbsp;{% endfor %}</span>
+    <small>наведи — суммы за месяц · протяни мышкой по графику — итоги за период</small>
   </div>
-  <svg viewBox="0 0 {{ ov.svg_w }} {{ ov.svg_h|add:20 }}" style="width:100%;height:220px">
-    {% for l in ov.lines %}<polyline points="{{ l.points }}" fill="none" stroke="{{ l.color }}" stroke-width="2" stroke-linejoin="round"/>{% endfor %}
-  </svg>
-  <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink2);padding:0 6px">
-    {% for m in months %}<span>{{ m }}</span>{% endfor %}
+  <div id="yleg" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;font-size:12px"></div>
+  <div id="ywrap" style="position:relative">
+    <svg id="ysvg" viewBox="0 0 960 320" style="width:100%;height:auto;display:block;touch-action:none"></svg>
+    <div id="ytip" style="position:absolute;pointer-events:none;opacity:0;transition:opacity .12s;
+         background:var(--sf);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh);
+         padding:9px 11px;font-size:12px;z-index:5;min-width:150px"></div>
   </div>
+  <div id="ysum" style="margin-top:10px;font-size:12.5px;color:var(--ink2)"></div>
 </div>
+<script id="ydata" type="application/json">{{ chart_json|safe }}</script>
 
 <section class="grid">
   <!-- ТОП КЛИЕНТОВ ПО ГОДАМ -->
   <div class="card wide">
-    <div class="ch"><span>Топ-8 клиентов по годам</span><small>выручка · концентрация топ-5 внизу</small></div>
+    <div class="ch"><span>Топ-8 клиентов по годам</span><small><a href="{% url 'sravnenie_clients' %}" class="link">все клиенты по годам →</a></small></div>
     <table>
       <thead><tr><th>Клиент</th>{% for y in ov.years %}<th>{{ y }}</th>{% endfor %}</tr></thead>
       <tbody>
@@ -47,7 +50,7 @@
 
   <!-- ТОП SKU ПО ГОДАМ -->
   <div class="card wide">
-    <div class="ch"><span>Топ-8 SKU по годам</span><small>выручка по номенклатуре</small></div>
+    <div class="ch"><span>Топ-8 SKU по годам</span><small><a href="{% url 'sravnenie_sku' %}" class="link">все SKU по годам →</a></small></div>
     <table>
       <thead><tr><th>SKU</th>{% for y in ov.years %}<th>{{ y }}</th>{% endfor %}</tr></thead>
       <tbody>
@@ -125,4 +128,121 @@
   </div>
 </section>
 {% endif %}
+
+<script>
+(function(){
+  var el=document.getElementById('ydata'); if(!el)return;
+  var D; try{D=JSON.parse(el.textContent);}catch(e){return;}
+  if(!D.years||!D.years.length)return;
+  var svg=document.getElementById('ysvg'), tip=document.getElementById('ytip'),
+      sumEl=document.getElementById('ysum'), leg=document.getElementById('yleg'), wrap=document.getElementById('ywrap');
+  var W=960,H=320, PL=64,PR=16,PT=16,PB=34, iw=W-PL-PR, ih=H-PT-PB;
+  var months=D.months, years=D.years, colors=D.colors, monthly=D.monthly;
+  var hidden={};
+  function fmt(n){return Math.round(n).toLocaleString('ru-RU');}
+  function fmtShort(n){var a=Math.abs(n);if(a>=1e6)return (n/1e6).toFixed(a>=1e7?0:1)+' млн';if(a>=1e3)return Math.round(n/1e3)+'к';return ''+Math.round(n);}
+  function vmax(){var m=1;years.forEach(function(y){if(hidden[y])return;monthly[y].forEach(function(v){if(v>m)m=v;});});return m;}
+  var NS='http://www.w3.org/2000/svg';
+  function E(t,a){var e=document.createElementNS(NS,t);for(var k in a)e.setAttribute(k,a[k]);return e;}
+  function X(i){return PL + (months.length<2?0:i/(months.length-1)*iw);}
+  function Y(v,mx){return PT + ih - (v/mx)*ih;}
+  var sel=null; // {a,b} индексы месяцев
+
+  function draw(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    var mx=vmax();
+    // сетка + подписи Y
+    for(var g=0; g<=4; g++){
+      var v=mx*g/4, yy=Y(v,mx);
+      svg.appendChild(E('line',{x1:PL,y1:yy,x2:W-PR,y2:yy,stroke:'var(--line)','stroke-width':1}));
+      var t=E('text',{x:PL-8,y:yy+4,'text-anchor':'end','font-size':11,fill:'var(--ink2)'});t.textContent=fmtShort(v);svg.appendChild(t);
+    }
+    // выделенный период
+    if(sel){var a=Math.min(sel.a,sel.b),b=Math.max(sel.a,sel.b);
+      svg.appendChild(E('rect',{x:X(a),y:PT,width:Math.max(2,X(b)-X(a)),height:ih,fill:'var(--pu)','fill-opacity':.08}));
+    }
+    // подписи месяцев
+    months.forEach(function(m,i){var t=E('text',{x:X(i),y:H-12,'text-anchor':'middle','font-size':11,fill:'var(--ink2)'});t.textContent=m;svg.appendChild(t);});
+    // линии по годам
+    years.forEach(function(y){
+      if(hidden[y])return;
+      var pts=monthly[y].map(function(v,i){return X(i)+','+Y(v,mx);}).join(' ');
+      svg.appendChild(E('polyline',{points:pts,fill:'none',stroke:colors[y],'stroke-width':2.5,'stroke-linejoin':'round','stroke-linecap':'round'}));
+      monthly[y].forEach(function(v,i){svg.appendChild(E('circle',{cx:X(i),cy:Y(v,mx),r:2.5,fill:colors[y]}));});
+    });
+    // вертикальная направляющая (создаём, двигаем при hover)
+    guide=E('line',{x1:0,y1:PT,x2:0,y2:PT+ih,stroke:'var(--pu)','stroke-width':1,opacity:0});
+    svg.appendChild(guide);
+  }
+  var guide;
+
+  function legend(){
+    leg.innerHTML='';
+    years.forEach(function(y){
+      var b=document.createElement('button');
+      b.type='button';
+      b.style.cssText='display:flex;align-items:center;gap:6px;background:none;border:0;cursor:pointer;font:inherit;font-size:12px;color:var(--ink);opacity:'+(hidden[y]?.4:1);
+      b.innerHTML='<span style="width:11px;height:11px;border-radius:3px;background:'+colors[y]+';display:inline-block"></span>'+y;
+      b.onclick=function(){hidden[y]=!hidden[y];draw();legend();updateSum();};
+      leg.appendChild(b);
+    });
+  }
+
+  function idxFromEvent(ev){
+    var r=svg.getBoundingClientRect();
+    var px=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+    var sx=px/r.width*W;                 // в координатах viewBox
+    var i=Math.round((sx-PL)/iw*(months.length-1));
+    return Math.max(0,Math.min(months.length-1,i));
+  }
+
+  function showTip(i,ev){
+    var mx=vmax();
+    guide.setAttribute('x1',X(i));guide.setAttribute('x2',X(i));guide.setAttribute('opacity',1);
+    var html='<div style="font-weight:600;margin-bottom:5px">'+months[i]+'</div>';
+    var base=null;
+    years.forEach(function(y){
+      if(hidden[y])return;
+      var v=monthly[y][i];
+      var delta='';
+      if(base!==null){var d=base? Math.round((v-base)/base*100):null; if(d!==null)delta=' <span style="color:'+(d>=0?'var(--grn)':'var(--red)')+'">'+(d>=0?'+':'')+d+'%</span>';}
+      html+='<div style="display:flex;justify-content:space-between;gap:12px"><span><span style="color:'+colors[y]+'">●</span> '+y+'</span><b>'+fmt(v)+' ₽'+delta+'</b></div>';
+      base=v;
+    });
+    tip.innerHTML=html; tip.style.opacity=1;
+    var r=svg.getBoundingClientRect(), sx=X(i)/W*r.width;
+    var left=sx+14; if(left>r.width-165)left=sx-165;
+    tip.style.left=Math.max(0,left)+'px'; tip.style.top='8px';
+  }
+  function hideTip(){tip.style.opacity=0; if(guide)guide.setAttribute('opacity',0);}
+
+  function updateSum(){
+    if(!sel){sumEl.innerHTML='<span style="color:var(--ink2)">Совет: протяни мышкой по графику, чтобы выделить период и увидеть итоги по годам за него.</span>';return;}
+    var a=Math.min(sel.a,sel.b),b=Math.max(sel.a,sel.b);
+    var label=(a===b)?months[a]:(months[a]+'–'+months[b]);
+    var html='<b>Период '+label+':</b> &nbsp;';
+    var prev=null, parts=[];
+    years.forEach(function(y){
+      if(hidden[y])return;
+      var s=0;for(var i=a;i<=b;i++)s+=monthly[y][i];
+      var g=''; if(prev!==null&&prev)g=' <span style="color:'+((s-prev)>=0?'var(--grn)':'var(--red)')+'">('+((s-prev)>=0?'+':'')+Math.round((s-prev)/prev*100)+'%)</span>';
+      parts.push('<span style="color:'+colors[y]+'">●</span> '+y+': <b>'+fmt(s)+' ₽</b>'+g);
+      prev=s;
+    });
+    sumEl.innerHTML=html+parts.join(' &nbsp;·&nbsp; ')+' &nbsp; <a href="#" id="yreset" class="link">сбросить</a>';
+    var rb=document.getElementById('yreset'); if(rb)rb.onclick=function(e){e.preventDefault();sel=null;draw();updateSum();};
+  }
+
+  // взаимодействие
+  var dragging=false, dragStart=null;
+  svg.addEventListener('mousemove',function(ev){var i=idxFromEvent(ev); if(dragging){sel={a:dragStart,b:i};draw();} showTip(i,ev);});
+  svg.addEventListener('mouseleave',function(){hideTip(); if(dragging){dragging=false; if(sel&&sel.a===sel.b)sel=null; draw(); updateSum();}});
+  svg.addEventListener('mousedown',function(ev){ev.preventDefault();dragging=true;dragStart=idxFromEvent(ev);sel={a:dragStart,b:dragStart};draw();});
+  window.addEventListener('mouseup',function(){if(dragging){dragging=false; if(sel&&sel.a===sel.b)sel=null; draw(); updateSum();}});
+  // клик по одному месяцу — выделить только его
+  svg.addEventListener('click',function(ev){ if(!sel){var i=idxFromEvent(ev); sel={a:i,b:i}; draw(); updateSum();} });
+
+  draw(); legend(); updateSum();
+})();
+</script>
 {% endblock %}
