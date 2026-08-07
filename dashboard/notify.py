@@ -51,12 +51,15 @@ def _tg_base():
 
 
 def tg_open(req_or_url, timeout=60, tries=4):
-    """urlopen с ретраями — РКН-троттлинг флапает, одна попытка ненадёжна."""
+    """urlopen с ретраями + нормальный User-Agent (Cloudflare режет дефолтный Python-urllib → 403)."""
     import time
+    req = urllib.request.Request(req_or_url) if isinstance(req_or_url, str) else req_or_url
+    if not req.has_header('User-agent'):
+        req.add_header('User-Agent', 'Mozilla/5.0 (KICK-bot)')
     last = None
     for i in range(tries):
         try:
-            return urllib.request.urlopen(req_or_url, timeout=timeout)
+            return urllib.request.urlopen(req, timeout=timeout)
         except Exception as e:
             last = e
             time.sleep(2 * (i + 1))
