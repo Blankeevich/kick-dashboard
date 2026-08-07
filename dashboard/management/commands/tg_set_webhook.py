@@ -35,3 +35,16 @@ class Command(BaseCommand):
         r = tg_open(url, timeout=30).read().decode('utf-8', 'ignore')
         self.stdout.write(self.style.SUCCESS('setWebhook → %s' % hook))
         self.stdout.write('ответ Telegram: ' + r)
+        # меню команд (по кнопке «/») — Telegram допускает только английские имена
+        cmds = [
+            {'command': 'digest', 'description': 'Полная сводка'},
+            {'command': 'sales', 'description': 'Продажи + топ клиентов'},
+            {'command': 'debt', 'description': 'Дебиторка + топ должников'},
+            {'command': 'overdue', 'description': 'Что просрочено'},
+            {'command': 'payments', 'description': 'Кто платит сегодня'},
+            {'command': 'leads', 'description': 'Воронка лидов'},
+        ]
+        data = urllib.parse.urlencode({'commands': json.dumps(cmds, ensure_ascii=False)}).encode()
+        req = urllib.request.Request('%s/bot%s/setMyCommands' % (base, token), data=data)
+        rc = tg_open(req, timeout=30).read().decode('utf-8', 'ignore')
+        self.stdout.write('setMyCommands: ' + rc)

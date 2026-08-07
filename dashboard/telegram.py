@@ -138,17 +138,17 @@ def handle_update(update):
     cmd = text.split()[0].lower().lstrip('/').split('@')[0]
     if cmd in ('start', 'help'):
         reply = 'Привет! Я бот KICK.\n\n' + HELP
-    elif cmd.startswith('свод'):
+    elif cmd in ('digest', 'svodka') or cmd.startswith('свод'):
         reply = digest_text()
-    elif cmd.startswith('прод'):
+    elif cmd in ('sales',) or cmd.startswith('прод'):
         reply = sales_block() + '\n\n' + top_clients_text()
-    elif cmd.startswith('долг'):
+    elif cmd in ('debt',) or cmd.startswith('долг'):
         reply = debt_block() + '\n\n' + top_debtors_text()
-    elif cmd.startswith('просроч'):
+    elif cmd in ('overdue',) or cmd.startswith('просроч'):
         reply = overdue_text()
-    elif cmd.startswith('оплат'):
+    elif cmd in ('payments', 'pay') or cmd.startswith('оплат'):
         reply = payments_today_block()
-    elif cmd.startswith('лид'):
+    elif cmd in ('leads',) or cmd.startswith('лид'):
         reply = leads_funnel_text()
     else:
         reply = 'Не понял команду.\n\n' + HELP
