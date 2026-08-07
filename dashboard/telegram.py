@@ -1,5 +1,6 @@
 """Телеграм-логика: утренняя сводка, блоки метрик, обработчик команд бота.
 Отправка — через dashboard.notify.send_telegram (прокси Cloudflare)."""
+import os
 from datetime import date, timedelta
 from django.db.models import Sum, Max
 from django.utils import timezone
@@ -129,11 +130,33 @@ HELP = ('Команды:\n/сводка — полная сводка\n/прод
         '/оплаты — кто платит сегодня\n/лиды — воронка лидов')
 
 
+def _allowed_chats():
+    """Разрешённые чаты. По умолчанию — только TELEGRAM_CHAT_ID (безопасно).
+    Чтобы дать доступ сотрудникам — TELEGRAM_ALLOWED_CHATS=id1,id2,... (или id группы)."""
+    s = set()
+    for x in (os.environ.get('TELEGRAM_ALLOWED_CHATS', '') or '').split(','):
+        x = x.strip()
+        if x:
+            s.add(x)
+    main = (os.environ.get('TELEGRAM_CHAT_ID', '') or '').strip()
+    if main:
+        s.add(main)
+    return s
+
+
 def handle_update(update):
     msg = update.get('message') or update.get('channel_post') or {}
     text = (msg.get('text') or '').strip()
-    chat = (msg.get('chat') or {}).get('id')
+    chat_obj = msg.get('chat') or {}
+    chat = chat_obj.get('id')
     if not chat or not text:
+        return
+    who = chat_obj.get('title') or chat_obj.get('username') or chat_obj.get('first_name') or ''
+    print('TG chat %s (%s): %s' % (chat, who, text[:60]))   # в журнал systemd — видно, кто пишет
+    allowed = _allowed_chats()
+    if allowed and str(chat) not in allowed:
+        send_telegram('Доступ к боту KICK ограничен. Твой chat_id: %s — передай его администратору.' % chat,
+                      chat_id=chat)
         return
     cmd = text.split()[0].lower().lstrip('/').split('@')[0]
     if cmd in ('start', 'help'):
