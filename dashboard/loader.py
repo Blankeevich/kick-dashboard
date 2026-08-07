@@ -96,12 +96,15 @@ def _classify(name):
 
 
 @transaction.atomic
-def _month_from_realno(no):
-    """Месяц из номера реализации ФРddmmyy/… (ФР310726 → июль). Для корректировок с основанием не из этого файла."""
+def _date_from_realno(no):
+    """Дата из номера реализации ФРddmmyy/… (ФР310726 → 31.07.2026). Для корректировок с основанием не из файла."""
     m = re.match(r'ФР\s*(\d{2})(\d{2})(\d{2})', str(no or '').strip())
     if m:
-        mm = int(m.group(2))
-        return mm if 1 <= mm <= 12 else None
+        dd, mm, yy = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        try:
+            return datetime(2000 + yy, mm, dd).date()
+        except ValueError:
+            return None
     return None
 
 
@@ -118,7 +121,7 @@ def load_sales_client(fileobj, filename, user=None):
     facts, total = [], 0
     last_facts = []      # факты текущего документа (для навешивания счёта/переноса корректировки)
     last_kind = None     # 'real' | 'korr' | 'other'
-    real_month = {}      # номер реализации → месяц (из реализаций этого файла)
+    real_date = {}       # номер реализации → дата отгрузки (из реализаций этого файла)
     for r in rows[2:]:
         doc = r[0]
         s = str(doc).strip() if doc is not None else ''
@@ -132,14 +135,16 @@ def load_sales_client(fileobj, filename, user=None):
                     f.schet_no = schet
             continue
         # дочерняя «Реализация … ФР…» под корректировкой — документ-основание (исходная отгрузка):
-        # переносим корректировку в МЕСЯЦ ОТГРУЗКИ, а не в месяц самой корректировки
+        # переносим корректировку на ДАТУ ОТГРУЗКИ (и дата документа, и месяц), а не на дату корректировки —
+        # чтобы и помесячный график, и фильтр по периоду, и возвраты считались по месяцу отгрузки
         if s.startswith('Реализа') and not client and last_kind == 'korr':
             mo = re.search(r'ФР\S+', s)
             base = mo.group(0).strip() if mo else ''
-            mth = real_month.get(base) or _month_from_realno(base)
-            if mth:
+            bdate = real_date.get(base) or _date_from_realno(base)
+            if bdate and bdate.year == year:      # переносим только в пределах того же года
                 for f in last_facts:
-                    f.month = mth
+                    f.doc_date = bdate
+                    f.month = bdate.month
             continue
         # подытоги/пустые/«Итого» — пропускаем, состояние НЕ сбрасываем
         # (между корректировкой и её основанием есть пустая строка-подытог)
@@ -166,7 +171,7 @@ def load_sales_client(fileobj, filename, user=None):
         if dt == 'Реализация' and dno:
             dd = _date(r[1])
             if dd:
-                real_month[dno] = dd.month
+                real_date[dno] = dd
     SalesFact.objects.bulk_create(facts, batch_size=1000)
     # завести в справочник всех покупателей (ровно под именем из продаж) — для групп/сшивки
     have = set(Client.objects.values_list('name', flat=True))
