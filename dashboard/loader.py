@@ -96,6 +96,15 @@ def _classify(name):
 
 
 @transaction.atomic
+def _month_from_realno(no):
+    """Месяц из номера реализации ФРddmmyy/… (ФР310726 → июль). Для корректировок с основанием не из этого файла."""
+    m = re.match(r'ФР\s*(\d{2})(\d{2})(\d{2})', str(no or '').strip())
+    if m:
+        mm = int(m.group(2))
+        return mm if 1 <= mm <= 12 else None
+    return None
+
+
 def load_sales_client(fileobj, filename, user=None):
     h = _hash(fileobj)
     if Upload.objects.filter(kind='sales_client', file_hash=h).exists():
@@ -107,19 +116,34 @@ def load_sales_client(fileobj, filename, user=None):
     # перезаливка: удаляем прошлые факты этого года
     SalesFact.objects.filter(year=year).delete()
     facts, total = [], 0
-    last_facts = []      # факты последней реализации — чтобы навесить на них номер счёта из дочерней строки
+    last_facts = []      # факты текущего документа (для навешивания счёта/переноса корректировки)
+    last_kind = None     # 'real' | 'korr' | 'other'
+    real_month = {}      # номер реализации → месяц (из реализаций этого файла)
     for r in rows[2:]:
         doc = r[0]
         s = str(doc).strip() if doc is not None else ''
-        # дочерняя строка «Счет покупателю 00БП-000498 от ...» — номер счёта предыдущей реализации
+        client = r[2] if len(r) > 2 else None
+        # дочерняя «Счет покупателю 00БП-000498 …» — счёт реализации
         if s.startswith('Счет покупателю') or s.startswith('Счёт покупателю'):
-            msc = re.search(r'Сч[её]т покупателю\s+(\S+)', s)
-            schet = msc.group(1).strip() if msc else ''
-            for f in last_facts:
-                f.schet_no = schet
+            if last_kind == 'real':
+                msc = re.search(r'Сч[её]т покупателю\s+(\S+)', s)
+                schet = msc.group(1).strip() if msc else ''
+                for f in last_facts:
+                    f.schet_no = schet
             continue
-        if doc is None or s in ('', 'Итого') or not r[2]:
-            last_facts = []
+        # дочерняя «Реализация … ФР…» под корректировкой — документ-основание (исходная отгрузка):
+        # переносим корректировку в МЕСЯЦ ОТГРУЗКИ, а не в месяц самой корректировки
+        if s.startswith('Реализа') and not client and last_kind == 'korr':
+            mo = re.search(r'ФР\S+', s)
+            base = mo.group(0).strip() if mo else ''
+            mth = real_month.get(base) or _month_from_realno(base)
+            if mth:
+                for f in last_facts:
+                    f.month = mth
+            continue
+        # подытоги/пустые/«Итого» — пропускаем, состояние НЕ сбрасываем
+        # (между корректировкой и её основанием есть пустая строка-подытог)
+        if not client or s in ('', 'Итого'):
             continue
         dt = ('Реализация' if s.startswith('Реализа') else 'Корректировка' if s.startswith('Корректировк')
               else 'Комиссионер' if s.startswith('Отчет комисс') else 'Прочее')
@@ -132,12 +156,17 @@ def load_sales_client(fileobj, filename, user=None):
             if amt is None and qty is None:
                 continue
             f = SalesFact(upload=up, doc_type=dt, doc_date=_date(r[1]), doc_no=dno,
-                          client=str(r[2]).strip(), manager=(str(r[3]).strip() if r[3] else ''),
+                          client=str(client).strip(), manager=(str(r[3]).strip() if r[3] else ''),
                           year=year, month=mnum, qty=qty or 0, amount=int(amt or 0))
             facts.append(f)
             cur.append(f)
             total += int(amt or 0)
         last_facts = cur
+        last_kind = 'korr' if dt == 'Корректировка' else 'real' if dt == 'Реализация' else 'other'
+        if dt == 'Реализация' and dno:
+            dd = _date(r[1])
+            if dd:
+                real_month[dno] = dd.month
     SalesFact.objects.bulk_create(facts, batch_size=1000)
     # завести в справочник всех покупателей (ровно под именем из продаж) — для групп/сшивки
     have = set(Client.objects.values_list('name', flat=True))
