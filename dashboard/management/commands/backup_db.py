@@ -14,7 +14,7 @@ import subprocess
 from datetime import datetime
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from dashboard.notify import send_email
+from dashboard.notify import send_email, send_telegram
 
 
 class Command(BaseCommand):
@@ -57,17 +57,22 @@ class Command(BaseCommand):
             os.remove(os.path.join(bdir, old))
         msg = 'Бэкап создан: %s (%.1f МБ), хранится последних %d' % (gz, size / 1e6, o['keep'])
         self.stdout.write(self.style.SUCCESS(msg))
-        # офсайт по почте
+        # офсайт: сначала Telegram (работает на Timeweb), потом почта (запасной)
         if not o['no_email']:
-            to = os.environ.get('BACKUP_EMAIL') or os.environ.get('ALERT_EMAIL')
-            if size > 24 * 1024 * 1024:
-                send_email('KICK бэкап: дамп слишком большой для письма',
-                           'Дамп %s = %.1f МБ, не влезает в письмо. Настрой выгрузку в облако.' % (gz, size / 1e6), to=to)
-                self.stdout.write(self.style.WARNING('Дамп >24МБ — письмом не отправлен, только локально'))
-            else:
-                with open(gz, 'rb') as f:
-                    data = f.read()
-                ok, detail = send_email('KICK бэкап БД %s' % ts,
-                                        'Ежедневный дамп базы KICK во вложении.', to=to,
-                                        attachments=[(os.path.basename(gz), data)])
-                self.stdout.write(('офсайт: ' + detail) if ok else self.style.ERROR('офсайт не ушёл: ' + detail))
+            if size > 48 * 1024 * 1024:
+                self.stdout.write(self.style.WARNING('Дамп >48МБ — офсайтом не отправлен, только локально'))
+                return
+            with open(gz, 'rb') as f:
+                data = f.read()
+            fname = os.path.basename(gz)
+            cap = 'KICK: ежедневный бэкап базы %s (%.1f МБ)' % (ts, size / 1e6)
+            ok, detail = send_telegram(cap, document=data, filename=fname)
+            if not ok and os.environ.get('TELEGRAM_BOT_TOKEN'):
+                self.stdout.write(self.style.ERROR('офсайт (Telegram) не ушёл: ' + detail))
+            if not ok:                       # Telegram не настроен/не смог — пробуем почту
+                to = os.environ.get('BACKUP_EMAIL') or os.environ.get('ALERT_EMAIL')
+                if size <= 24 * 1024 * 1024:
+                    ok, detail = send_email('KICK бэкап БД %s' % ts,
+                                            'Ежедневный дамп базы KICK во вложении.', to=to,
+                                            attachments=[(fname, data)])
+            self.stdout.write(('офсайт: ' + detail) if ok else self.style.ERROR('офсайт не ушёл: ' + detail))

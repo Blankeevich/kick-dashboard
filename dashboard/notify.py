@@ -1,12 +1,44 @@
-"""Отправка писем (алерты, бэкапы) через SMTP mail.ru.
-Креды берутся из окружения (те же, что у приёмника почты):
-  MAIL_USER, MAIL_PASS · опц. MAIL_SMTP_HOST (по умолч. smtp.mail.ru), MAIL_SMTP_PORT (465)
+"""Отправка алертов и бэкапов. Два канала:
+  1) Telegram (по HTTPS — работает на Timeweb, в отличие от SMTP): TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+  2) SMTP mail.ru (запасной; на Timeweb исходящий SMTP часто заблокирован): MAIL_USER, MAIL_PASS,
+     MAIL_SMTP_HOST (smtp.mail.ru), MAIL_SMTP_PORT (465)
 Ничего не хранится в коде/гите.
 """
 import os
-import smtplib
+import time
 import ssl
+import smtplib
+import urllib.parse
+import urllib.request
 from email.message import EmailMessage
+
+
+def send_telegram(text, document=None, filename='file'):
+    """Шлёт в Telegram текст, а если задан document (bytes) — файл. (ok, detail)."""
+    token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    chat = os.environ.get('TELEGRAM_CHAT_ID')
+    if not (token and chat):
+        return False, 'нет TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID'
+    try:
+        if document is None:
+            data = urllib.parse.urlencode({'chat_id': chat, 'text': text[:4000]}).encode()
+            urllib.request.urlopen('https://api.telegram.org/bot%s/sendMessage' % token, data=data, timeout=60)
+        else:
+            boundary = '----kick%d' % int(time.time())
+
+            def field(name, val):
+                return ('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n'
+                        % (boundary, name, val)).encode()
+            body = field('chat_id', chat) + field('caption', text[:1000])
+            body += ('--%s\r\nContent-Disposition: form-data; name="document"; filename="%s"\r\n'
+                     'Content-Type: application/octet-stream\r\n\r\n' % (boundary, filename)).encode()
+            body += document + b'\r\n' + ('--%s--\r\n' % boundary).encode()
+            req = urllib.request.Request('https://api.telegram.org/bot%s/sendDocument' % token, data=body)
+            req.add_header('Content-Type', 'multipart/form-data; boundary=%s' % boundary)
+            urllib.request.urlopen(req, timeout=180)
+        return True, 'отправлено в Telegram'
+    except Exception as e:
+        return False, 'Telegram ошибка: %s' % e
 
 
 def send_email(subject, body, to=None, attachments=None):

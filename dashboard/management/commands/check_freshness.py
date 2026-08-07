@@ -9,7 +9,7 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from dashboard.models import Upload
-from dashboard.notify import send_email
+from dashboard.notify import send_email, send_telegram
 
 
 class Command(BaseCommand):
@@ -39,7 +39,9 @@ class Command(BaseCommand):
         body = ('Внимание: данные в дашборде KICK давно не обновлялись — возможно, сбой рассылки 1С '
                 'или письмо не пришло/прочитано вручную.\n\n' + '\n'.join('• ' + s for s in stale) +
                 '\n\nПроверь рассылку отчётов в 1С и приёмник почты. https://erp.pkfoodrev.ru')
-        ok, detail = send_email('⚠️ KICK: данные не обновились', body)
+        ok, detail = send_telegram('⚠️ KICK: данные не обновились\n\n' + body)
+        if not ok:
+            ok, detail = send_email('⚠️ KICK: данные не обновились', body)
         if ok:
             self.stdout.write(self.style.WARNING('Алерт отправлен: ' + detail))
         else:
