@@ -19,8 +19,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR('Нет TELEGRAM_BOT_TOKEN в окружении (.env)'))
             return
         base = os.environ.get('TELEGRAM_API_BASE', 'https://api.telegram.org').rstrip('/')
+        from dashboard.notify import tg_open
         try:
-            raw = urllib.request.urlopen('%s/bot%s/getUpdates' % (base, token), timeout=30).read()
+            raw = tg_open('%s/bot%s/getUpdates' % (base, token), timeout=30).read()
             data = json.loads(raw)
         except Exception as e:
             self.stdout.write(self.style.ERROR('Ошибка запроса: %s' % e))

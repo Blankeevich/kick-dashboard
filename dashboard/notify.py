@@ -50,6 +50,19 @@ def _tg_base():
     return os.environ.get('TELEGRAM_API_BASE', 'https://api.telegram.org').rstrip('/')
 
 
+def tg_open(req_or_url, timeout=60, tries=4):
+    """urlopen с ретраями — РКН-троттлинг флапает, одна попытка ненадёжна."""
+    import time
+    last = None
+    for i in range(tries):
+        try:
+            return urllib.request.urlopen(req_or_url, timeout=timeout)
+        except Exception as e:
+            last = e
+            time.sleep(2 * (i + 1))
+    raise last
+
+
 def send_telegram(text, document=None, filename='file'):
     """Шлёт в Telegram текст, а если задан document (bytes) — файл. (ok, detail)."""
     token = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -60,7 +73,7 @@ def send_telegram(text, document=None, filename='file'):
     try:
         if document is None:
             data = urllib.parse.urlencode({'chat_id': chat, 'text': text[:4000]}).encode()
-            urllib.request.urlopen('%s/bot%s/sendMessage' % (base, token), data=data, timeout=60)
+            tg_open(urllib.request.Request('%s/bot%s/sendMessage' % (base, token), data=data), timeout=60)
         else:
             boundary = '----kick%d' % int(time.time())
 
@@ -73,7 +86,7 @@ def send_telegram(text, document=None, filename='file'):
             body += document + b'\r\n' + ('--%s--\r\n' % boundary).encode()
             req = urllib.request.Request('%s/bot%s/sendDocument' % (base, token), data=body)
             req.add_header('Content-Type', 'multipart/form-data; boundary=%s' % boundary)
-            urllib.request.urlopen(req, timeout=180)
+            tg_open(req, timeout=180)
         return True, 'отправлено в Telegram'
     except Exception as e:
         return False, 'Telegram ошибка: %s' % e
