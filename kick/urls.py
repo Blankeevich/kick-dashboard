@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.urls import path
+from django.views.decorators.csrf import csrf_exempt
 from dashboard import views
 
 urlpatterns = [
@@ -37,4 +38,5 @@ urlpatterns = [
     path('upload/', views.upload, name='upload'),
     path('login/', views.Login.as_view(), name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('tg/<secret>/webhook/', csrf_exempt(views.tg_webhook), name='tg_webhook'),
 ]

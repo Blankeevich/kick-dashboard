@@ -66,16 +66,18 @@ def tg_open(req_or_url, timeout=60, tries=4):
     raise last
 
 
-def send_telegram(text, document=None, filename='file'):
-    """Шлёт в Telegram текст, а если задан document (bytes) — файл. (ok, detail)."""
+def send_telegram(text, document=None, filename='file', chat_id=None):
+    """Шлёт в Telegram текст, а если задан document (bytes) — файл. (ok, detail).
+    chat_id переопределяет TELEGRAM_CHAT_ID (нужно для ответов боту тому, кто написал)."""
     token = os.environ.get('TELEGRAM_BOT_TOKEN')
-    chat = os.environ.get('TELEGRAM_CHAT_ID')
+    chat = chat_id or os.environ.get('TELEGRAM_CHAT_ID')
     if not (token and chat):
         return False, 'нет TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID'
     base = _tg_base()
     try:
         if document is None:
-            data = urllib.parse.urlencode({'chat_id': chat, 'text': text[:4000]}).encode()
+            data = urllib.parse.urlencode({'chat_id': chat, 'text': text[:4000],
+                                           'parse_mode': 'HTML', 'disable_web_page_preview': 'true'}).encode()
             tg_open(urllib.request.Request('%s/bot%s/sendMessage' % (base, token), data=data), timeout=60)
         else:
             boundary = '----kick%d' % int(time.time())

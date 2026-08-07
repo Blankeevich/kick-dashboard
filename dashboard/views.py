@@ -951,6 +951,26 @@ def lead_import(request):
     return render(request, 'dashboard/lead_import.html', {'page': 'leads', 'result': result})
 
 
+def tg_webhook(request, secret):
+    """Приём апдейтов Telegram (команды боту). Секрет в URL защищает от чужих запросов."""
+    import os
+    import json
+    from django.http import HttpResponse
+    from django.views.decorators.csrf import csrf_exempt
+    expected = os.environ.get('TELEGRAM_WEBHOOK_SECRET', '')
+    if not expected or secret != expected:
+        return HttpResponse('forbidden', status=403)
+    if request.method != 'POST':
+        return HttpResponse('ok')
+    try:
+        update = json.loads(request.body.decode('utf-8'))
+        from .telegram import handle_update
+        handle_update(update)
+    except Exception:
+        pass          # не роняем вебхук на кривом апдейте — Telegram иначе задолбает ретраями
+    return HttpResponse('ok')
+
+
 class Login(LoginView):
     template_name = 'dashboard/login.html'
 
