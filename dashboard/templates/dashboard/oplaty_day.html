@@ -15,7 +15,7 @@
       <tbody>
         {% for r in rows %}<tr {% if r.light == 'red' %}class="bad"{% endif %}>
           <td><a class="link" href="{% url 'debtor' r.client %}">{{ r.client }}</a></td>
-          <td style="font-variant-numeric:tabular-nums">{% if r.schet %}<b>{{ r.schet }}</b> · {% endif %}{{ r.doc_no|default:"—" }}</td>
+          <td style="font-variant-numeric:tabular-nums">{% if r.schet %}{% if onec_schet %}<a class="link" href="{% url 'doc_download' 'schet' r.schet %}" title="скачать счёт из 1С" onclick="event.stopPropagation()"><b>{{ r.schet }}</b></a>{% else %}<b>{{ r.schet }}</b>{% endif %} · {% endif %}{% if r.doc_no %}{% if onec_real %}<a class="link" href="{% url 'doc_download' 'real' r.doc_no %}" title="скачать реализацию из 1С" onclick="event.stopPropagation()">{{ r.doc_no }}</a>{% else %}{{ r.doc_no }}{% endif %}{% else %}—{% endif %}</td>
           <td>{{ r.ship_date|date:"d.m.Y"|default:"—" }}</td>
           <td>{{ r.debt_total|intcomma }} ₽</td>
         </tr>{% endfor %}

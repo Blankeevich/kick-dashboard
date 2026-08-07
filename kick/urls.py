@@ -39,4 +39,5 @@ urlpatterns = [
     path('login/', views.Login.as_view(), name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('tg/<secret>/webhook/', csrf_exempt(views.tg_webhook), name='tg_webhook'),
+    path('doc/<kind>/<path:number>/', views.doc_download, name='doc_download'),
 ]

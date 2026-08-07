@@ -147,9 +147,11 @@ def debtor(request, client):
         fallback = metrics.client_sales(client)
         for x in fallback:
             x['date_str'] = x['doc_date'].strftime('%d.%m.%Y') if x['doc_date'] else '—'
+    from . import onec
     c.update({'client_name': client, 'debt': d,
               'debtor_row': d['debtors'][0] if d['debtors'] else None,
-              'lines': lines, 'sales': fallback})
+              'lines': lines, 'sales': fallback,
+              'onec_schet': onec.ready('schet'), 'onec_real': onec.ready('real')})
     return render(request, 'dashboard/debtor.html', c)
 
 
@@ -469,11 +471,13 @@ def client_card(request, client):
              'now_v': p['now'][i], 'prev_v': p['prev'][i]} for i in range(12)]
     hmax = max([h['debt_total'] for h in p['hist']], default=1) or 1
     hist = [{'date': h['date'], 'total': h['debt_total'], 'h': round(h['debt_total'] / hmax * 100)} for h in p['hist']]
+    from . import onec
     return render(request, 'dashboard/client_card.html', {
         'page': 'clients', 'client_name': client, 'p': p, 'bars': bars, 'hist': hist,
         'cur_year': sel_y, 'prev_year': sel_y - 1, 'sales_years': years, 'sel_y': sel_y,
         'can_edit': can_edit, 'saved': saved, 'channels': Client.CHANNELS, 'statuses': Client.STATUS,
-        'last_sales': last_sales, 'last_debt': last_debt})
+        'last_sales': last_sales, 'last_debt': last_debt,
+        'onec_schet': onec.ready('schet'), 'onec_real': onec.ready('real')})
 
 
 @login_required
@@ -509,7 +513,18 @@ def oplaty_day(request, day):
         'total': sum(r['debt_total'] for r in rows),
         'overdue': sum(r['debt_overdue'] for r in rows),
         'back_ym': f'{d.year}-{d.month:02d}',
+        'onec_schet': onec_ready_schet(), 'onec_real': onec_ready_real(),
     })
+
+
+def onec_ready_schet():
+    from . import onec
+    return onec.ready('schet')
+
+
+def onec_ready_real():
+    from . import onec
+    return onec.ready('real')
 
 
 @login_required
@@ -949,6 +964,26 @@ def lead_import(request):
         result = {'created': created, 'skipped': skipped, 'total': len(parsed)}
         _lead_log(request, 'import', detail='создано %s, пропущено %s' % (created, skipped))
     return render(request, 'dashboard/lead_import.html', {'page': 'leads', 'result': result})
+
+
+@login_required
+def doc_download(request, kind, number):
+    """Скачать документ (счёт/реализацию) из 1С по номеру — через сервер (креды 1С не в браузере)."""
+    from django.http import HttpResponse, HttpResponseBadRequest
+    from . import onec
+    if kind not in ('schet', 'real'):
+        return HttpResponseBadRequest('bad kind')
+    res, err = onec.fetch_doc(kind, number)
+    if err:
+        return HttpResponse('Не удалось получить документ из 1С.\n%s' % err,
+                            status=502, content_type='text/plain; charset=utf-8')
+    data, ct = res
+    ext = 'pdf' if 'pdf' in (ct or '').lower() else 'bin'
+    label = 'Счет' if kind == 'schet' else 'Реализация'
+    fn = ('%s_%s.%s' % (label, number, ext)).replace('/', '-').replace(' ', '_')
+    resp = HttpResponse(data, content_type=ct or 'application/pdf')
+    resp['Content-Disposition'] = 'attachment; filename="%s"' % fn
+    return resp
 
 
 def tg_webhook(request, secret):
