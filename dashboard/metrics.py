@@ -1010,7 +1010,9 @@ def clients_list(year):
     for r in SalesFact.objects.exclude(client__in=excl).values('client', 'year').annotate(s=Sum('amount')):
         sales_year[(r['client'], r['year'])] = r['s'] or 0
     debt = {}
-    for r in DebtFact.objects.exclude(client__in=excl).values('client').annotate(t=Sum('debt_total'), o=Sum('debt_overdue')):
+    snap = _latest_debt_date()      # ТОЛЬКО последний снимок, иначе долг суммируется по всем снимкам
+    for r in (DebtFact.objects.filter(snapshot_date=snap).exclude(client__in=excl)
+              .values('client').annotate(t=Sum('debt_total'), o=Sum('debt_overdue'))):
         debt[r['client']] = (r['t'] or 0, r['o'] or 0)
     dir_rows = {c['name']: c for c in Client.objects.exclude(excluded=True)
                 .values('name', 'channel', 'inn', 'synced_at')}
