@@ -69,7 +69,7 @@
           <td>{% if d.debt_overdue %}<b class="bad">{{ d.debt_overdue|intcomma }} ₽</b>{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>
           <td>{% if d.delta > 0 %}<span class="bad">↑ {{ d.delta_abs|intcomma }}</span>{% elif d.delta < 0 %}<span class="up">↓ {{ d.delta_abs|intcomma }}</span>{% else %}<span style="color:var(--ink2)">—</span>{% endif %}</td>
           <td>{% if d.overdue_days > 0 %}<span class="pill {% if d.overdue_days > 30 %}red{% else %}amb{% endif %}">{{ d.overdue_days }} дней</span>{% else %}<span class="pill">в сроке</span>{% endif %}</td>
-          <td>{{ d.due_date|date:"d.m.Y"|default:"—" }}</td><td>{{ d.manager }}</td>
+          <td>{{ d.due_date|date:"d.m.Y"|default:"—" }}</td><td>{% if d.manager %}<a class="thlink" href="{% url 'manager_card' d.manager %}" onclick="event.stopPropagation()">{{ d.manager }}</a>{% else %}—{% endif %}</td>
         </tr>{% endfor %}
       </tbody>
     </table>

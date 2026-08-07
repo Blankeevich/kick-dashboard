@@ -14,14 +14,14 @@
       <table>
         <thead><tr><th>Контрагент</th><th>Выручка</th><th>Доля</th></tr></thead>
         <tbody>
-          {% for c in all_clients %}<tr><td>{{ c.name }}</td><td>{{ c.amount|intcomma }} ₽</td><td>{{ c.share }}%</td></tr>{% endfor %}
+          {% for c in all_clients %}<tr onclick="location.href='{% url 'client_card' c.name %}'" style="cursor:pointer"><td>{{ c.name }}</td><td>{{ c.amount|intcomma }} ₽</td><td>{{ c.share }}%</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>
   </div>
   <div class="card">
     <div class="ch"><span>По менеджерам</span><small>сумма · клиентов</small></div>
-    <ul class="rows">{% for m in managers %}<li><span class="nm">{{ m.manager }}</span><span class="vl">{{ m.amount|intcomma }} · <span class="q">{{ m.clients }} кл</span></span></li>{% endfor %}</ul>
+    <ul class="rows">{% for m in managers %}<li><span class="nm">{% if m.manager %}<a class="thlink" href="{% url 'manager_card' m.manager %}">{{ m.manager }}</a>{% else %}—{% endif %}</span><span class="vl">{{ m.amount|intcomma }} · <span class="q">{{ m.clients }} кл</span></span></li>{% endfor %}</ul>
   </div>
   <div class="card wide">
     <div class="ch"><span>Выполнение плана</span><small>план задаётся в админке</small></div>
@@ -30,7 +30,7 @@
       <thead><tr><th>Месяц</th><th>Менеджер</th><th>План</th><th>Факт</th><th>Выполнение</th></tr></thead>
       <tbody>
         {% for p in plans %}<tr>
-          <td>{{ p.month_name }}</td><td>{{ p.manager }}</td>
+          <td>{{ p.month_name }}</td><td>{% if p.manager %}<a class="thlink" href="{% url 'manager_card' p.manager %}">{{ p.manager }}</a>{% else %}—{% endif %}</td>
           <td>{{ p.plan|intcomma }} ₽</td><td>{{ p.fact|intcomma }} ₽</td>
           <td><b class="{% if p.pct >= 100 %}up{% elif p.pct < 70 %}bad{% endif %}">{{ p.pct }}%</b>
             {% if p.pct >= 100 %}<span class="pill">выполнен</span>{% else %}<span class="pill {% if p.pct < 70 %}red{% else %}amb{% endif %}">осталось {{ p.remaining|intcomma }} ₽</span>{% endif %}</td>

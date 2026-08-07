@@ -7,7 +7,7 @@
     <div class="at">На что обратить внимание</div>
     <ul class="al">
       <li>🔴 <div><b>Продажи падают почти вдвое:</b> {{ yoy_delta }}% к прошлому году за 7 месяцев ({{ cur_year }} против {{ prev_year }}).</div></li>
-      {% for d in debtors %}{% if d.overdue_days > 60 %}<li>🔴 <div><b>{{ d.client }}</b> — просрочка {{ d.overdue_days }} дней, долг {{ d.debt_total|intcomma }} ₽.</div></li>{% endif %}{% endfor %}
+      {% for d in debtors %}{% if d.overdue_days > 60 %}<li>🔴 <div><b><a class="thlink" href="{% url 'client_card' d.client %}">{{ d.client }}</a></b> — просрочка {{ d.overdue_days }} дней, долг {{ d.debt_total|intcomma }} ₽.</div></li>{% endif %}{% endfor %}
     </ul>
   </div>
 </div>
@@ -42,7 +42,7 @@
   <div class="card">
     <div class="ch"><span>Топ клиентов</span><a class="link" href="{% url 'prodazhi' %}?{{ request.GET.urlencode }}">все →</a></div>
     <ul class="rows">
-      {% for c in top_clients %}<li><span class="nm">{{ c.name }}</span><span class="vl">{{ c.amount|intcomma }} · {{ c.share }}%</span></li>{% endfor %}
+      {% for c in top_clients %}<li><span class="nm"><a class="thlink" href="{% url 'client_card' c.name %}">{{ c.name }}</a></span><span class="vl">{{ c.amount|intcomma }} · {{ c.share }}%</span></li>{% endfor %}
     </ul>
     <div class="foot">Полный список всех контрагентов — в разделе «Продажи»</div>
   </div>

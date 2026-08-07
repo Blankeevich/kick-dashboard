@@ -39,7 +39,7 @@
     <table>
       <thead><tr><th>Клиент</th>{% for y in ov.years %}<th>{{ y }}</th>{% endfor %}</tr></thead>
       <tbody>
-        {% for r in ov.top_clients %}<tr>
+        {% for r in ov.top_clients %}<tr onclick="location.href='{% url 'client_card' r.name %}'" style="cursor:pointer">
           <td>{{ r.name }}</td>
           {% for v in r.by_year %}<td>{% if v %}{{ v|intcomma }}{% else %}—{% endif %}</td>{% endfor %}
         </tr>{% endfor %}
@@ -68,7 +68,7 @@
     <table>
       <thead><tr><th>Менеджер</th>{% for y in ov.years %}<th>{{ y }}</th>{% endfor %}</tr></thead>
       <tbody>
-        {% for r in ov.top_managers %}<tr><td>{{ r.name }}</td>{% for v in r.by_year %}<td>{% if v %}{{ v|intcomma }}{% else %}—{% endif %}</td>{% endfor %}</tr>{% endfor %}
+        {% for r in ov.top_managers %}<tr onclick="location.href='{% url 'manager_card' r.name %}'" style="cursor:pointer"><td>{{ r.name }}</td>{% for v in r.by_year %}<td>{% if v %}{{ v|intcomma }}{% else %}—{% endif %}</td>{% endfor %}</tr>{% endfor %}
       </tbody>
     </table>
   </div>

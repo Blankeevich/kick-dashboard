@@ -35,7 +35,7 @@
       </tr>
     </thead>
     <tbody>
-      {% for r in rows %}<tr>
+      {% for r in rows %}<tr {% if kind == 'client' %}onclick="location.href='{% url 'client_card' r.name %}'" style="cursor:pointer"{% endif %}>
         <td>{{ r.name }}</td>
         {% for c in r.cells %}
           {% if kind == 'sku' %}
