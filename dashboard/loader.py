@@ -107,24 +107,37 @@ def load_sales_client(fileobj, filename, user=None):
     # перезаливка: удаляем прошлые факты этого года
     SalesFact.objects.filter(year=year).delete()
     facts, total = [], 0
+    last_facts = []      # факты последней реализации — чтобы навесить на них номер счёта из дочерней строки
     for r in rows[2:]:
         doc = r[0]
-        if doc is None or str(doc).strip() in ('', 'Итого') or not r[2]:
+        s = str(doc).strip() if doc is not None else ''
+        # дочерняя строка «Счет покупателю 00БП-000498 от ...» — номер счёта предыдущей реализации
+        if s.startswith('Счет покупателю') or s.startswith('Счёт покупателю'):
+            msc = re.search(r'Сч[её]т покупателю\s+(\S+)', s)
+            schet = msc.group(1).strip() if msc else ''
+            for f in last_facts:
+                f.schet_no = schet
             continue
-        s = str(doc).strip()
+        if doc is None or s in ('', 'Итого') or not r[2]:
+            last_facts = []
+            continue
         dt = ('Реализация' if s.startswith('Реализа') else 'Корректировка' if s.startswith('Корректировк')
               else 'Комиссионер' if s.startswith('Отчет комисс') else 'Прочее')
         mno = re.search(r'№\s*(\S+)', s)
         dno = mno.group(1) if mno else ''
+        cur = []
         for mnum, col in cols.items():
             amt = _num(r[col + 1])
             qty = _num(r[col])
             if amt is None and qty is None:
                 continue
-            facts.append(SalesFact(upload=up, doc_type=dt, doc_date=_date(r[1]), doc_no=dno,
-                                   client=str(r[2]).strip(), manager=(str(r[3]).strip() if r[3] else ''),
-                                   year=year, month=mnum, qty=qty or 0, amount=int(amt or 0)))
+            f = SalesFact(upload=up, doc_type=dt, doc_date=_date(r[1]), doc_no=dno,
+                          client=str(r[2]).strip(), manager=(str(r[3]).strip() if r[3] else ''),
+                          year=year, month=mnum, qty=qty or 0, amount=int(amt or 0))
+            facts.append(f)
+            cur.append(f)
             total += int(amt or 0)
+        last_facts = cur
     SalesFact.objects.bulk_create(facts, batch_size=1000)
     # завести в справочник всех покупателей (ровно под именем из продаж) — для групп/сшивки
     have = set(Client.objects.values_list('name', flat=True))

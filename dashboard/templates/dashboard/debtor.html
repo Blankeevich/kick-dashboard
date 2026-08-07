@@ -13,11 +13,11 @@
     <div class="ch"><span>Из чего складывается долг</span><small>реализации по срокам оплаты · просроченные сверху</small></div>
     {% if lines %}
     <table>
-      <thead><tr><th></th><th>Документ</th><th>Отгрузка</th><th>Срок оплаты</th><th>Долг по документу</th><th>Просрочено</th><th>Статус</th></tr></thead>
+      <thead><tr><th></th><th>Счёт → Реализация</th><th>Отгрузка</th><th>Срок оплаты</th><th>Долг по документу</th><th>Просрочено</th><th>Статус</th></tr></thead>
       <tbody>
         {% for l in lines %}<tr {% if l.light == 'red' %}class="bad"{% endif %}>
           <td><span class="dot {{ l.light }}"></span></td>
-          <td style="font-variant-numeric:tabular-nums">{{ l.doc_no|default:"—" }}</td>
+          <td style="font-variant-numeric:tabular-nums">{% if l.schet %}<b>{{ l.schet }}</b> · {% endif %}{{ l.doc_no|default:"—" }}</td>
           <td>{{ l.ship_date|date:"d.m.Y"|default:"—" }}</td>
           <td>{{ l.due_date|date:"d.m.Y"|default:"—" }}</td>
           <td>{{ l.debt_total|intcomma }} ₽</td>

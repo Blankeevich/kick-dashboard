@@ -148,6 +148,12 @@ def debt_summary(manager=None, client=None, only_overdue=False, min_amount=1000,
             'count': qs.count(), 'debtors': debtors}
 
 
+def schet_map():
+    """Реализация (doc_no) → номер счёта на оплату (00БП-…), из продаж."""
+    return dict(SalesFact.objects.exclude(schet_no='').exclude(doc_no='')
+                .values_list('doc_no', 'schet_no'))
+
+
 def debt_lines(client, snapshot=None):
     """Реализации, формирующие долг клиента (расшифровка из 1С). Просроченные — сверху."""
     from .models import DebtLine
@@ -156,8 +162,10 @@ def debt_lines(client, snapshot=None):
                 .order_by('-debt_overdue', 'due_date', '-debt_total')
                 .values('doc_no', 'ship_date', 'due_date', 'debt_total',
                         'debt_overdue', 'overdue_days', 'bucket'))
+    smap = schet_map()
     for r in rows:  # светофор: красный >30 дн · жёлтый просрочен · зелёный в сроке
         r['light'] = 'red' if r['overdue_days'] > 30 else 'amb' if r['overdue_days'] > 0 else 'green'
+        r['schet'] = smap.get(r['doc_no'], '')
     return rows
 
 
@@ -958,8 +966,10 @@ def payment_day(d):
     rows = list(DebtLine.objects.filter(snapshot_date=snap, due_date=d).order_by('-debt_total')
                 .values('client', 'doc_no', 'ship_date', 'due_date',
                         'debt_total', 'debt_overdue', 'overdue_days'))
+    smap = schet_map()
     for r in rows:
         r['light'] = 'red' if r['overdue_days'] > 30 else 'amb' if r['overdue_days'] > 0 else 'green'
+        r['schet'] = smap.get(r['doc_no'], '')
     return rows
 
 
