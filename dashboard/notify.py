@@ -10,7 +10,39 @@ import ssl
 import smtplib
 import urllib.parse
 import urllib.request
+import urllib.error
 from email.message import EmailMessage
+
+
+def send_yadisk(filename, data):
+    """Загружает файл на Яндекс.Диск по WebDAV (надёжно с российского VPS). (ok, detail).
+    Нужен YADISK_USER (логин Яндекса) и YADISK_PASS (пароль приложения для WebDAV)."""
+    import base64
+    user = os.environ.get('YADISK_USER')
+    pwd = os.environ.get('YADISK_PASS')
+    if not (user and pwd):
+        return False, 'нет YADISK_USER/YADISK_PASS'
+    folder = os.environ.get('YADISK_DIR', 'kick_backups').strip('/')
+    auth = 'Basic ' + base64.b64encode(('%s:%s' % (user, pwd)).encode()).decode()
+    # создаём папку (MKCOL) — если уже есть, вернётся 405, это ок
+    try:
+        mk = urllib.request.Request('https://webdav.yandex.ru/%s' % folder, method='MKCOL')
+        mk.add_header('Authorization', auth)
+        try:
+            urllib.request.urlopen(mk, timeout=60)
+        except urllib.error.HTTPError as e:
+            if e.code not in (405, 409, 201):
+                pass
+    except Exception:
+        pass
+    url = 'https://webdav.yandex.ru/%s/%s' % (folder, filename)
+    try:
+        req = urllib.request.Request(url, data=data, method='PUT')
+        req.add_header('Authorization', auth)
+        urllib.request.urlopen(req, timeout=300)
+        return True, 'загружено на Яндекс.Диск (%s/%s)' % (folder, filename)
+    except Exception as e:
+        return False, 'Яндекс.Диск ошибка: %s' % e
 
 
 def send_telegram(text, document=None, filename='file'):

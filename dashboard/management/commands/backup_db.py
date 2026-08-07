@@ -14,7 +14,7 @@ import subprocess
 from datetime import datetime
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from dashboard.notify import send_email, send_telegram
+from dashboard.notify import send_email, send_telegram, send_yadisk
 
 
 class Command(BaseCommand):
@@ -66,10 +66,11 @@ class Command(BaseCommand):
                 data = f.read()
             fname = os.path.basename(gz)
             cap = 'KICK: ежедневный бэкап базы %s (%.1f МБ)' % (ts, size / 1e6)
-            ok, detail = send_telegram(cap, document=data, filename=fname)
-            if not ok and os.environ.get('TELEGRAM_BOT_TOKEN'):
-                self.stdout.write(self.style.ERROR('офсайт (Telegram) не ушёл: ' + detail))
-            if not ok:                       # Telegram не настроен/не смог — пробуем почту
+            # приоритет каналов для российского VPS: Яндекс.Диск → Telegram → почта
+            ok, detail = send_yadisk(fname, data)
+            if not ok and not os.environ.get('YADISK_USER'):
+                ok, detail = send_telegram(cap, document=data, filename=fname)
+            if not ok and not os.environ.get('TELEGRAM_BOT_TOKEN') and not os.environ.get('YADISK_USER'):
                 to = os.environ.get('BACKUP_EMAIL') or os.environ.get('ALERT_EMAIL')
                 if size <= 24 * 1024 * 1024:
                     ok, detail = send_email('KICK бэкап БД %s' % ts,
