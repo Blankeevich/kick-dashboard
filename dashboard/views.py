@@ -160,12 +160,13 @@ def upload(request):
                       {'page': 'upload', 'msg': [], 'no_access': True})
     msg = []
     if request.method == 'POST':
+        force = bool(request.POST.get('force'))
         fn_map = {'sales_client': loader.load_sales_client,
                   'sales_sku': loader.load_sales_sku, 'debt': loader.load_debt}
         for key, fn in fn_map.items():
             f = request.FILES.get(key)
             if f:
-                r = fn(f, f.name, request.user)
+                r = fn(f, f.name, request.user, force=force)
                 msg.append(f'{key}: пропущено — {r["reason"]}' if r.get('skipped')
                            else f'{key}: загружено {r["rows"]} строк, сумма {r["total"]:,} ₽')
         fp = request.FILES.get('packaging')

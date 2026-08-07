@@ -23,10 +23,13 @@
         <div style="font-size:11px;color:#6b6b70;margin-top:6px">Только поставщики:</div><input type="file" name="contractors_sup" accept=".mxl">
       </div>
     </div>
-    <button class="btn" style="margin-top:18px" type="submit">Загрузить</button>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;color:var(--ink2);cursor:pointer">
+      <input type="checkbox" name="force"> Перезагрузить принудительно (игнорировать проверку «файл уже загружен»)
+    </label>
+    <button class="btn" style="margin-top:14px" type="submit">Загрузить</button>
   </form>
   {% if msg %}<div class="foot"><b>Результат:</b><ul>{% for m in msg %}<li>{{ m }}</li>{% endfor %}</ul></div>{% endif %}
-  <div class="foot">Можно загрузить один или несколько файлов. Повторная загрузка того же файла пропускается. Новая выгрузка года заменяет старую.</div>
+  <div class="foot">Можно загрузить один или несколько файлов. Повторная загрузка того же файла пропускается — поставь галочку «Перезагрузить принудительно», чтобы залить его заново (например, после изменения логики разбора). Новая выгрузка года заменяет старую.</div>
 </div>
 {% endif %}
 {% endblock %}

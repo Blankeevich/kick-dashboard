@@ -108,9 +108,9 @@ def _date_from_realno(no):
     return None
 
 
-def load_sales_client(fileobj, filename, user=None):
+def load_sales_client(fileobj, filename, user=None, force=False):
     h = _hash(fileobj)
-    if Upload.objects.filter(kind='sales_client', file_hash=h).exists():
+    if not force and Upload.objects.filter(kind='sales_client', file_hash=h).exists():
         return {'skipped': True, 'reason': 'Такой файл уже загружен (совпал хеш)'}
     rows = _read_rows(fileobj, filename)
     cols, year = _month_cols(rows[0])
@@ -185,9 +185,9 @@ def load_sales_client(fileobj, filename, user=None):
 
 
 @transaction.atomic
-def load_sales_sku(fileobj, filename, user=None):
+def load_sales_sku(fileobj, filename, user=None, force=False):
     h = _hash(fileobj)
-    if Upload.objects.filter(kind='sales_sku', file_hash=h).exists():
+    if not force and Upload.objects.filter(kind='sales_sku', file_hash=h).exists():
         return {'skipped': True, 'reason': 'Такой файл уже загружен'}
     rows = _read_rows(fileobj, filename)
     cols, year = _month_cols(rows[0])
@@ -306,9 +306,9 @@ def _parse_debt_old(rows):
 
 
 @transaction.atomic
-def load_debt(fileobj, filename, user=None):
+def load_debt(fileobj, filename, user=None, force=False):
     h = _hash(fileobj)
-    if Upload.objects.filter(kind='debt', file_hash=h).exists():
+    if not force and Upload.objects.filter(kind='debt', file_hash=h).exists():
         return {'skipped': True, 'reason': 'Такой файл уже загружен'}
     rows = _read_rows(fileobj, filename)
     # строгое распознавание нового формата: в шапке «Менеджер…» в кол.A и «Покупатель» в кол.B
