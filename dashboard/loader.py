@@ -113,11 +113,16 @@ def load_sales_client(fileobj, filename, user=None, force=False):
     if not force and Upload.objects.filter(kind='sales_client', file_hash=h).exists():
         return {'skipped': True, 'reason': 'Такой файл уже загружен (совпал хеш)'}
     rows = _read_rows(fileobj, filename)
+    if not rows or len(rows) < 3:
+        return {'skipped': True, 'reason': 'Файл пустой или без данных — загрузка отменена'}
     cols, year = _month_cols(rows[0])
+    # ВАЛИДАЦИЯ структуры: без колонок месяцев или без года это не отчёт «Продажи по контрагентам».
+    # Критично: без проверки пустой/чужой файл прошёл бы дальше и УДАЛИЛ данные года.
+    if not cols or not year:
+        return {'skipped': True, 'reason': 'Не похоже на «Продажи по контрагентам»: не найдены '
+                'колонки месяцев/год в шапке. Данные НЕ тронуты.'}
     up = Upload.objects.create(kind='sales_client', filename=filename, file_hash=h,
                                period_year=year, uploaded_by=user)
-    # перезаливка: удаляем прошлые факты этого года
-    SalesFact.objects.filter(year=year).delete()
     facts, total = [], 0
     last_facts = []      # факты текущего документа (для навешивания счёта/переноса корректировки)
     last_kind = None     # 'real' | 'korr' | 'other'
@@ -172,6 +177,15 @@ def load_sales_client(fileobj, filename, user=None, force=False):
             dd = _date(r[1])
             if dd:
                 real_date[dno] = dd
+    # перезаливка: удаляем ТОЛЬКО реально затронутые (год, месяц) — с учётом переноса корректировок.
+    # Так частичный файл не стирает другие месяцы, а перезаливка не двоит перенесённые корректировки.
+    from django.db.models import Q
+    touched = {(f.year, f.month) for f in facts}
+    if touched:
+        q = Q()
+        for y, m in touched:
+            q |= Q(year=y, month=m)
+        SalesFact.objects.filter(q).delete()
     SalesFact.objects.bulk_create(facts, batch_size=1000)
     # завести в справочник всех покупателей (ровно под именем из продаж) — для групп/сшивки
     have = set(Client.objects.values_list('name', flat=True))

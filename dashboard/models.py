@@ -256,8 +256,31 @@ class CostItem(models.Model):
         verbose_name_plural = 'Себестоимость (справочник)'
         ordering = ['line', 'name']
 
+    def save(self, *args, **kwargs):
+        # SCD-lite: при изменении себестоимости фиксируем запись в истории (с датой),
+        # чтобы маржа прошлых периодов не переписывалась текущей ценой.
+        super().save(*args, **kwargs)
+        last = self.history.first()
+        if last is None or round(last.cost, 2) != round(self.cost or 0, 2):
+            CostHistory.objects.create(cost_item=self, cost=self.cost or 0)
+
     def __str__(self):
         return self.name
+
+
+class CostHistory(models.Model):
+    """История себестоимости позиции (SCD-lite): цена + дата вступления в силу."""
+    cost_item = models.ForeignKey(CostItem, on_delete=models.CASCADE, related_name='history')
+    cost = models.FloatField('Себестоимость без НДС, ₽')
+    effective_from = models.DateField('Действует с', auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'История себестоимости'
+        verbose_name_plural = 'История себестоимости'
+        ordering = ['-effective_from', '-id']
+
+    def __str__(self):
+        return '%s: %s c %s' % (self.cost_item_id, self.cost, self.effective_from)
 
 
 class CostGroup(models.Model):

@@ -561,6 +561,14 @@ def cost_margin(vat=0.22, group=None):
             'avg_margin_simple': round(sum(r['mp'] for r in mapped) / len(mapped)) if mapped else 0}
 
 
+def cost_on(cost_item_id, on_date):
+    """Себестоимость позиции, действовавшая на дату (SCD-lite). None, если истории нет."""
+    from .models import CostHistory
+    h = (CostHistory.objects.filter(cost_item_id=cost_item_id, effective_from__lte=on_date)
+         .order_by('-effective_from', '-id').first())
+    return h.cost if h else None
+
+
 def _cost_by_sku():
     """Себестоимость по нормализованному имени SKU (свой + привязанные СТМ)."""
     import re

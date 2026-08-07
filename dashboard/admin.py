@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import admin
+from .models import CostHistory
 from .models import (Upload, Client, SkuMap, SalesPlan, PackagingItem, DebtLine,
                      SalesFact, DebtSnapshot, ManagerProfile, CostItem, CostSku, SkuFact, CostGroup,
                      Lead, LeadStage, LeadNote, SalesManager, LeadLog)
@@ -88,10 +89,21 @@ class CostSkuInline(admin.TabularInline):
     verbose_name_plural = 'Ещё SKU этого рецепта (СТМ, другие бренды)'
 
 
+class CostHistoryInline(admin.TabularInline):
+    model = CostHistory
+    extra = 0
+    can_delete = False
+    readonly_fields = ('cost', 'effective_from')
+    verbose_name_plural = 'История себестоимости (заполняется автоматически при изменении)'
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(CostItem)
 class CostItemAdmin(admin.ModelAdmin):
     form = CostItemForm
-    inlines = [CostSkuInline]
+    inlines = [CostSkuInline, CostHistoryInline]
     list_display = ('name', 'line', 'cost', 'sku', 'updated_at')
     list_filter = ('line',)
     search_fields = ('name', 'sku')

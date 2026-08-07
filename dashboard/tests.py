@@ -1,49 +1,87 @@
-"""Тесты дебиторки: разбор нового формата и защита от обнуления кривым файлом."""
+"""Golden-file тесты загрузчика продаж: номер счёта, перенос корректировки в месяц отгрузки,
+валидация структуры, безопасность частичной перезаливки. Синтетические xlsx строятся в памяти.
+Запуск: manage.py test dashboard
+"""
+import datetime
+from io import BytesIO
+import openpyxl
 from django.test import TestCase
-from dashboard.loader import _parse_debt_new, _parse_debt_old
+from dashboard import loader
+from dashboard.models import SalesFact
 
 
-class DebtParserTests(TestCase):
-    def test_new_format_parses_client_and_lines(self):
-        rows = [
-            ['Менеджер', 'Покупатель', 'Отгрузка', 'Оплата', 'Долг', 'Просроч', 'Дней',
-             'До 7', '8-15', '16-30', '31-40', '41-90', '>90'],
-            ['Документ', '', '', '', '', '', '', '', '', '', '', '', ''],
-            ['Иванов', 'ООО Ромашка', '01.05.2026', '10.05.2026', 1000, 1000, 20,
-             '', '', 1000, '', '', ''],
-            ['Реализация (акт) № ФР1 от 01.05.2026', '', '01.05.2026', '10.05.2026',
-             600, 600, 20, '', '', 600, '', '', ''],
-            ['Реализация (акт) № ФР2 от 02.05.2026', '', '02.05.2026', '11.05.2026',
-             400, 400, 19, '', '', 400, '', '', ''],
+HEADER = ['Документ', 'Дата', 'Контрагент', 'Менеджер', 'июль 26', '', 'авг. 26', '']
+SUB = ['Документ.Основание', '', '', '', 'Количество', 'Сумма', 'Количество', 'Сумма']
+
+
+def _wb(header, sub, data):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Лист_1'
+    ws.append(header)
+    ws.append(sub)
+    for r in data:
+        ws.append(r)
+    b = BytesIO()
+    wb.save(b)
+    b.seek(0)
+    b.name = 'test.xlsx'
+    return b
+
+
+class SalesLoaderTests(TestCase):
+
+    def test_schet_and_correction_reassigned_to_shipment(self):
+        data = [
+            ['Реализация (акт, накладная, УПД) № ФР150726/1 от 15.07.2026',
+             datetime.datetime(2026, 7, 15), 'КЛИЕНТ А', 'Менеджер М', 10, 1000, None, None],
+            ['Счет покупателю 00БП-000500 от 10.07.2026', None, None, None, 10, 1000, None, None],
+            # корректировка сделана 3 августа, но на июльскую отгрузку ФР150726/1
+            ['Корректировка реализации № ФР030826/K1 от 03.08.2026',
+             datetime.datetime(2026, 8, 3), 'КЛИЕНТ А', 'Менеджер М', None, None, -2, -200],
+            [None, None, None, None, None, None, -2, -200],
+            ['Реализация (акт, накладная, УПД) ФР150726/1 от 15.07.2026',
+             None, None, None, None, None, -2, -200],
         ]
-        facts, lines, total = _parse_debt_new(rows, 'на 30.06.2026.xlsx')
-        self.assertEqual(len(facts), 1)
-        self.assertEqual(total, 1000)
-        self.assertEqual(facts[0]['client'], 'ООО Ромашка')
-        self.assertEqual(len(lines), 2)
-        self.assertEqual(lines[0]['doc_no'], 'ФР1')                    # номер извлекается
-        self.assertEqual(sum(l['debt_total'] for l in lines), 1000)    # строки = итог клиента
+        r = loader.load_sales_client(_wb(HEADER, SUB, data), 'test.xlsx', force=True)
+        self.assertFalse(r.get('skipped'), r)
+        real = SalesFact.objects.get(doc_no='ФР150726/1', doc_type='Реализация')
+        self.assertEqual(real.schet_no, '00БП-000500')     # номер счёта навешен
+        self.assertEqual(real.month, 7)
+        corr = SalesFact.objects.get(doc_no='ФР030826/K1')
+        self.assertEqual(corr.month, 7)                     # перенесена в месяц отгрузки
+        self.assertEqual(corr.doc_date, datetime.date(2026, 7, 15))  # и дата — отгрузки
+        self.assertEqual(corr.amount, -200)
 
-    def test_unrecognized_file_returns_empty(self):
-        # чужой/битый файл → пустой разбор → load_debt его пропустит и НЕ обнулит данные
-        rows = [['что-то', 'другое'], [1, 2, 3]]
-        self.assertEqual(_parse_debt_new(rows, 'x')[0], [])
-        self.assertEqual(_parse_debt_old(rows)[0], [])
+    def test_validation_rejects_non_sales_file(self):
+        r = loader.load_sales_client(_wb(['abc', 'def'], ['x', 'y'], [['foo', 'bar']]),
+                                     'garbage.xlsx', force=True)
+        self.assertTrue(r.get('skipped'))
+        self.assertEqual(SalesFact.objects.count(), 0)      # данные не тронуты
 
-    def test_phantom_duplicate_line_removed(self):
-        # фантомный повтор реализации без номера (та же сумма/даты) не должен задваивать
-        rows = [
-            ['Менеджер', 'Покупатель', 'Отгр', 'Оплата', 'Долг', 'Просроч', 'Дней',
-             '', '', '', '', '', ''],
-            ['Документ', '', '', '', '', '', '', '', '', '', '', '', ''],
-            ['Иванов', 'ООО Тест', '01.05.2026', '10.05.2026', 300, 0, 0, '', '', '', '', '', ''],
-            ['Реализация (акт) № ФР1 от 01.05.2026', '', '01.05.2026', '10.05.2026', 150, 0, 0,
-             '', '', '', '', '', ''],
-            ['Реализация (акт, накладная, УПД)', '', '01.05.2026', '10.05.2026', 150, 0, 0,
-             '', '', '', '', '', ''],   # фантом без номера — дубль ФР1
-            ['Реализация (акт) № ФР2 от 02.05.2026', '', '02.05.2026', '11.05.2026', 150, 0, 0,
-             '', '', '', '', '', ''],
+    def test_partial_reload_keeps_other_months(self):
+        july = [['Реализация (акт, накладная, УПД) № ФР010726/1 от 01.07.2026',
+                 datetime.datetime(2026, 7, 1), 'B', 'M', 5, 500, None, None],
+                ['Счет покупателю 00БП-1 от 01.07.2026', None, None, None, 5, 500, None, None]]
+        loader.load_sales_client(_wb(HEADER, SUB, july), 'jul.xlsx', force=True)
+        aug_h = ['Документ', 'Дата', 'Контрагент', 'Менеджер', 'авг. 26', '']
+        aug_s = ['Документ.Основание', '', '', '', 'Количество', 'Сумма']
+        aug = [['Реализация (акт, накладная, УПД) № ФР050826/1 от 05.08.2026',
+                datetime.datetime(2026, 8, 5), 'B', 'M', 3, 300]]
+        loader.load_sales_client(_wb(aug_h, aug_s, aug), 'aug.xlsx', force=True)
+        # июльская реализация НЕ должна пропасть при загрузке августовского файла
+        self.assertTrue(SalesFact.objects.filter(doc_no='ФР010726/1').exists())
+        self.assertTrue(SalesFact.objects.filter(doc_no='ФР050826/1').exists())
+
+    def test_month_from_number_when_basis_not_in_file(self):
+        # корректировка с основанием, которого нет в файле — месяц берём из номера ФРддммгг
+        data = [
+            ['Корректировка реализации № ФР050826/K9 от 05.08.2026',
+             datetime.datetime(2026, 8, 5), 'КЛИЕНТ Х', 'М', None, None, -1, -50],
+            [None, None, None, None, None, None, -1, -50],
+            ['Реализация (акт, накладная, УПД) ФР200726/3 от 20.07.2026',
+             None, None, None, None, None, -1, -50],
         ]
-        _f, lines, _t = _parse_debt_new(rows, 'x')
-        self.assertEqual(len(lines), 2)
-        self.assertEqual({l['doc_no'] for l in lines}, {'ФР1', 'ФР2'})
+        loader.load_sales_client(_wb(HEADER, SUB, data), 'x.xlsx', force=True)
+        corr = SalesFact.objects.get(doc_no='ФР050826/K9')
+        self.assertEqual(corr.month, 7)                     # 20.07 → июль, из номера основания
