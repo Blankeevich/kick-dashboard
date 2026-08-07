@@ -45,16 +45,22 @@ def send_yadisk(filename, data):
         return False, 'Яндекс.Диск ошибка: %s' % e
 
 
+def _tg_base():
+    # можно пустить через прокси (Cloudflare Worker), если api.telegram.org недоступен с РФ-хостинга
+    return os.environ.get('TELEGRAM_API_BASE', 'https://api.telegram.org').rstrip('/')
+
+
 def send_telegram(text, document=None, filename='file'):
     """Шлёт в Telegram текст, а если задан document (bytes) — файл. (ok, detail)."""
     token = os.environ.get('TELEGRAM_BOT_TOKEN')
     chat = os.environ.get('TELEGRAM_CHAT_ID')
     if not (token and chat):
         return False, 'нет TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID'
+    base = _tg_base()
     try:
         if document is None:
             data = urllib.parse.urlencode({'chat_id': chat, 'text': text[:4000]}).encode()
-            urllib.request.urlopen('https://api.telegram.org/bot%s/sendMessage' % token, data=data, timeout=60)
+            urllib.request.urlopen('%s/bot%s/sendMessage' % (base, token), data=data, timeout=60)
         else:
             boundary = '----kick%d' % int(time.time())
 
@@ -65,7 +71,7 @@ def send_telegram(text, document=None, filename='file'):
             body += ('--%s\r\nContent-Disposition: form-data; name="document"; filename="%s"\r\n'
                      'Content-Type: application/octet-stream\r\n\r\n' % (boundary, filename)).encode()
             body += document + b'\r\n' + ('--%s--\r\n' % boundary).encode()
-            req = urllib.request.Request('https://api.telegram.org/bot%s/sendDocument' % token, data=body)
+            req = urllib.request.Request('%s/bot%s/sendDocument' % (base, token), data=body)
             req.add_header('Content-Type', 'multipart/form-data; boundary=%s' % boundary)
             urllib.request.urlopen(req, timeout=180)
         return True, 'отправлено в Telegram'
