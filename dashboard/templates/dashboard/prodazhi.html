@@ -7,6 +7,24 @@
   <div class="kpi"><div class="kl">Контрагентов</div><div class="kv sm">{{ all_clients|length }}</div><div class="kf">купили за период</div></div>
   <div class="kpi"><div class="kl">Менеджеров</div><div class="kv sm">{{ managers|length }}</div><div class="kf">активных</div></div>
 </section>
+{% if korr_unlinked %}
+<div class="card wide" style="border-color:var(--amb);margin-bottom:14px">
+  <div class="ch"><span>⚠️ Корректировки без реализации</span><small>{{ korr_unlinked|length }} шт · не привязаны к отгрузке</small></div>
+  <table>
+    <thead><tr><th>Клиент</th><th>Документ</th><th>Осела в месяце</th><th>Сумма</th><th></th></tr></thead>
+    <tbody>
+      {% for k in korr_unlinked %}<tr class="bad">
+        <td><a class="link" href="{% url 'client_card' k.client %}">{{ k.client }}</a></td>
+        <td style="font-variant-numeric:tabular-nums">{{ k.doc_no|default:"—" }}</td>
+        <td>{{ k.month }}.{{ k.year }}</td>
+        <td>{{ k.amount|intcomma }} ₽</td>
+        <td><span class="pill amb" title="В выгрузке нет строки-основания «Реализация … ФР…» под этой корректировкой, поэтому месяц не перенесён на дату отгрузки">без реализации</span></td>
+      </tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="warnbox">Эти корректировки сидят в месяце корректировки, а не отгрузки — из-за этого месяц может уходить в минус. Причина: отчёт «Продажи по контрагентам» выгружен без документа-основания. Перевыгрузите с основанием (строка «Реализация … ФР…» под корректировкой) и загрузите заново с галкой принудительной перезагрузки.</div>
+</div>
+{% endif %}
 <section class="grid">
   <div class="card">
     <div class="ch"><span>Все контрагенты</span><small>{{ all_clients|length }} · прокрутка</small></div>

@@ -44,6 +44,19 @@ def sales_summary(year=None, **f):
     return {'total': total, 'returns': returns, 'by_month': by_month}
 
 
+def korr_unlinked(year=None, **f):
+    """Корректировки без документа-основания (реализации): их месяц НЕ перенесён на дату
+    отгрузки, поэтому они могут искажать период (уводить месяц в минус). Один словарь = один документ."""
+    qs = sales_qs(year, **f).filter(doc_type='Корректировка', base_no='')
+    docs = {}
+    for r in qs.values('doc_no', 'client', 'year', 'month').annotate(s=Sum('amount')):
+        key = (r['doc_no'], r['client'])
+        d = docs.setdefault(key, {'doc_no': r['doc_no'], 'client': r['client'],
+                                  'year': r['year'], 'month': r['month'], 'amount': 0})
+        d['amount'] += r['s'] or 0
+    return sorted(docs.values(), key=lambda x: (x['year'], x['month'], x['doc_no']))
+
+
 def all_clients(year=None, **f):
     qs = sales_qs(year, **f)
     total = qs.aggregate(s=Sum('amount'))['s'] or 1

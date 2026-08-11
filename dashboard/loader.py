@@ -146,8 +146,9 @@ def load_sales_client(fileobj, filename, user=None, force=False):
             mo = re.search(r'ФР\S+', s)
             base = mo.group(0).strip() if mo else ''
             bdate = real_date.get(base) or _date_from_realno(base)
-            if bdate and bdate.year == year:      # переносим только в пределах того же года
-                for f in last_facts:
+            for f in last_facts:
+                f.base_no = base                  # привязка корректировки к реализации (для флага «без реализации»)
+                if bdate and bdate.year == year:  # переносим только в пределах того же года
                     f.doc_date = bdate
                     f.month = bdate.month
             continue

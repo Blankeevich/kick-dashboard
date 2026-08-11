@@ -53,6 +53,7 @@ class SalesFact(models.Model):
     amount = models.BigIntegerField('Сумма с НДС', default=0)
     doc_no = models.CharField('Номер документа', max_length=60, blank=True, db_index=True)
     schet_no = models.CharField('Номер счёта на оплату', max_length=60, blank=True, db_index=True)
+    base_no = models.CharField('Основание (реализация) для корректировки', max_length=60, blank=True, default='', db_index=True)
 
     class Meta:
         verbose_name = 'Продажа'

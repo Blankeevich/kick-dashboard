@@ -8,6 +8,7 @@
     <ul class="al">
       <li>🔴 <div><b>Продажи падают почти вдвое:</b> {{ yoy_delta }}% к прошлому году за 7 месяцев ({{ cur_year }} против {{ prev_year }}).</div></li>
       {% for d in debtors %}{% if d.overdue_days > 60 %}<li>🔴 <div><b><a class="thlink" href="{% url 'client_card' d.client %}">{{ d.client }}</a></b> — просрочка {{ d.overdue_days }} дней, долг {{ d.debt_total|intcomma }} ₽.</div></li>{% endif %}{% endfor %}
+      {% if korr_unlinked %}<li>⚠️ <div><b>Корректировки без реализации: {{ korr_unlinked|length }}</b> — не привязаны к отгрузке и могут уводить месяц в минус. <a class="thlink" href="{% url 'prodazhi' %}">Проверить на «Продажах»</a>. Причина — выгрузка без документа-основания.</div></li>{% endif %}
     </ul>
   </div>
 </div>
