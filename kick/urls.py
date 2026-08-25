@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
-from dashboard import views
+from dashboard import views, api
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -40,4 +40,16 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('tg/<secret>/webhook/', csrf_exempt(views.tg_webhook), name='tg_webhook'),
     path('doc/<kind>/<path:number>/', views.doc_download, name='doc_download'),
+    # ---- Read-only JSON API для внешних ИИ (ChatGPT Actions / Claude) ----
+    path('api/v1/openapi.json', api.openapi),
+    path('api/v1/health', api.health),
+    path('api/v1/overview', api.overview),
+    path('api/v1/sales', api.sales),
+    path('api/v1/top-clients', api.top_clients),
+    path('api/v1/managers', api.managers),
+    path('api/v1/top-sku', api.top_sku),
+    path('api/v1/debtors', api.debtors),
+    path('api/v1/margin', api.margin),
+    path('api/v1/client', api.client),
+    path('api/v1/signals', api.signals),
 ]
