@@ -194,8 +194,12 @@ def endpoint(request, key=None):
         return JsonResponse({'error': 'unauthorized'}, status=401)
 
     if request.method == 'GET':
-        # опциональный SSE-стрим сервер→клиент не поддерживаем
-        return HttpResponse(status=405)
+        # MCP Streamable HTTP: GET открывает SSE-канал сервер→клиент. Отдаём валидный 200
+        # event-stream (иначе клиент Claude трактует 405 как проблему авторизации коннектора).
+        resp = HttpResponse(': ok\n\n', content_type='text/event-stream')
+        resp['Cache-Control'] = 'no-cache'
+        resp['X-Accel-Buffering'] = 'no'
+        return resp
     if request.method != 'POST':
         return HttpResponse(status=405)
 
