@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
-from dashboard import views, api
+from dashboard import views, api, mcp
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -52,4 +52,8 @@ urlpatterns = [
     path('api/v1/margin', api.margin),
     path('api/v1/client', api.client),
     path('api/v1/signals', api.signals),
+    # ---- MCP-сервер (Streamable HTTP) для Claude ----
+    path('mcp', mcp.endpoint),
+    path('mcp/', mcp.endpoint),
+    path('mcp/<key>/', mcp.endpoint),
 ]
