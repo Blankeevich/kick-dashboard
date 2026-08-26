@@ -56,4 +56,5 @@ urlpatterns = [
     path('mcp', mcp.endpoint),
     path('mcp/', mcp.endpoint),
     path('mcp/<key>/', mcp.endpoint),
+    path('mcp/<key>', mcp.endpoint),
 ]

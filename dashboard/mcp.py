@@ -191,7 +191,9 @@ def endpoint(request, key=None):
     if not got and auth.lower().startswith('bearer '):
         got = auth[7:].strip()
     if got != real:
-        return JsonResponse({'error': 'unauthorized'}, status=401)
+        # Секрет-URL: неверный/отсутствующий ключ = «не найдено» (404), а НЕ 401.
+        # Иначе клиент-коннектор Claude трактует 401 как «сервер требует вход» и не подключается.
+        return HttpResponse(status=404)
 
     if request.method == 'GET':
         # MCP Streamable HTTP: GET открывает SSE-канал сервер→клиент. Отдаём валидный 200
