@@ -187,8 +187,8 @@ def signals(request):
 
 # ---------- OpenAPI-схема для ChatGPT «Actions» ----------
 def openapi(request):
-    base = (os.environ.get('SITE_URL') or ('%s://%s' % (
-        'https' if request.is_secure() else 'http', request.get_host()))).rstrip('/')
+    # Всегда https: сайт за Nginx с SSL, а ChatGPT требует, чтобы server URL был под https-origin схемы.
+    base = (os.environ.get('SITE_URL') or ('https://' + request.get_host())).rstrip('/')
 
     def op(opid, summary, params=None):
         p = [{'name': n, 'in': 'query', 'required': False,
@@ -208,8 +208,10 @@ def openapi(request):
                  'description': 'Read-only доступ к аналитике: продажи, дебиторка, маржа, лиды, карточка клиента.'},
         'servers': [{'url': base}],
         'security': [{'ApiKeyAuth': []}],
-        'components': {'securitySchemes': {
-            'ApiKeyAuth': {'type': 'apiKey', 'in': 'header', 'name': 'X-API-Key'}}},
+        'components': {
+            'schemas': {},
+            'securitySchemes': {
+                'ApiKeyAuth': {'type': 'apiKey', 'in': 'header', 'name': 'X-API-Key'}}},
         'paths': {
             '/api/v1/overview': op('getOverview', 'Ключевые показатели: продажи YTD, YoY, дебиторка, топ-должники'),
             '/api/v1/sales': op('getSales', 'Продажи за год: итог, возвраты, помесячно, год-к-году', [yrp, fm, fc, fk]),
