@@ -409,6 +409,12 @@ def _parse_debt_map(rows, filename):
             continue
         seen.add(k)
         dedup.append(l)
+    # сводный формат (нет построчных документов): строим строки графика оплат из клиентских
+    # фактов — у каждого есть срок оплаты и сумма, иначе «График оплат» был бы пуст
+    if not dedup and facts:
+        dedup = [dict(client=f['client'], doc_no='', ship_date=f['ship_date'], due_date=f['due_date'],
+                      debt_total=f['debt_total'], debt_overdue=f['debt_overdue'],
+                      overdue_days=f['overdue_days'], bucket='') for f in facts]
     return facts, dedup, total
 
 
