@@ -321,6 +321,97 @@ def _parse_debt_old(rows):
     return facts, [], total
 
 
+def _dbg_norm(s):
+    return str(s).replace('\xa0', ' ').strip().lower() if s is not None else ''
+
+
+def _parse_debt_map(rows, filename):
+    """Универсальный разбор «по срокам долга»: находит строку-шапку где угодно (даже под
+    блоком-заголовком и пустыми строками) и сопоставляет колонки ПО НАЗВАНИЯМ, а не по номерам —
+    поэтому переживает объединённые ячейки и разъехавшиеся столбцы. Понимает оба варианта:
+    с колонкой «Менеджер/Документ» и построчными реализациями, и сводку по клиентам без них."""
+    # дата снимка: из имени файла, иначе из строки-заголовка «…на ДД.ММ.ГГГГ»
+    m = re.search(r'на (\d{2})\.(\d{2})\.(\d{4})', filename)
+    if not m:
+        head = ' '.join(str(c) for r in rows[:6] for c in r if c not in (None, ''))
+        m = re.search(r'на (\d{2})\.(\d{2})\.(\d{4})', head)
+    snap = datetime(int(m.group(3)), int(m.group(2)), int(m.group(1))).date() if m else None
+
+    # 1) строка-шапка: первая ячейка «Покупатель»/«Контрагент» в первых 60 строках
+    hdr = c_client = None
+    for i, r in enumerate(rows[:60]):
+        for j, c in enumerate(r):
+            t = _dbg_norm(c)
+            if t.startswith('покупател') or t == 'контрагент':
+                hdr, c_client = i, j
+                break
+        if hdr is not None:
+            break
+    if hdr is None:
+        return [], [], 0
+
+    # 2) карта колонок по названиям (заголовки бывают на 1-2 строки — берём первое имя на колонку)
+    names = {}
+    for rr in rows[hdr:hdr + 2]:
+        for j, c in enumerate(rr):
+            t = _dbg_norm(c)
+            if t and j not in names:
+                names[j] = t
+
+    def col(pred):
+        return next((j for j, t in names.items() if pred(t)), None)
+
+    c_manager = col(lambda t: 'менеджер' in t or t == 'документ')
+    c_ship = col(lambda t: 'дата отгрузки' in t)
+    c_due = col(lambda t: 'ожидаемой оплаты' in t)
+    c_total = col(lambda t: t == 'общая задолженность')          # именно она, не «…по срокам»
+    c_over = col(lambda t: 'просроченн' in t)
+    c_days = col(lambda t: 'срок просрочки' in t)
+    if c_total is None:
+        return [], [], 0
+
+    def g(r, j):
+        return r[j] if (j is not None and j < len(r)) else None
+
+    facts, lines, total, cur = [], [], 0, None
+    for r in rows[hdr + 1:]:
+        raw_client = str(g(r, c_client)).replace('\xa0', ' ').strip() if g(r, c_client) is not None else ''
+        low_client = raw_client.lower()
+        man = str(g(r, c_manager)).replace('\xa0', ' ').strip() if (c_manager is not None and g(r, c_manager) is not None) else ''
+        tot = _num(g(r, c_total))
+        # строка-клиент: имя в колонке «Покупатель», не «Итого», не подзаголовок корзин
+        if raw_client and low_client not in ('итого', 'покупатель', 'контрагент') \
+                and not low_client.startswith('до ') and 'дней' not in low_client:
+            cur = raw_client
+            if tot:
+                mgr = man if (c_manager is not None and man.lower() != 'документ' and 'реализац' not in man.lower()) else ''
+                facts.append(dict(client=cur, manager=mgr, snapshot_date=snap,
+                                  ship_date=_date(g(r, c_ship)), due_date=_date(g(r, c_due)),
+                                  debt_total=int(tot), debt_overdue=int(_num(g(r, c_over)) or 0),
+                                  overdue_days=int(_num(g(r, c_days)) or 0)))
+                total += int(tot)
+        # строка-документ под клиентом (есть колонка менеджер/документ, имя клиента пустое)
+        elif c_manager is not None and man and not raw_client and cur and tot and man.lower() != 'итого':
+            mno = re.search(r'№\s*(\S+)', man)
+            lines.append(dict(client=cur, doc_no=(mno.group(1) if mno else ''),
+                              ship_date=_date(g(r, c_ship)), due_date=_date(g(r, c_due)),
+                              debt_total=int(tot), debt_overdue=int(_num(g(r, c_over)) or 0),
+                              overdue_days=int(_num(g(r, c_days)) or 0), bucket=''))
+
+    # дедуп безномерных дублей строк с номером (как в _parse_debt_new)
+    numbered = {(l['client'], l['ship_date'], l['due_date'], l['debt_total']) for l in lines if l['doc_no']}
+    seen, dedup = set(), []
+    for l in lines:
+        k = (l['client'], l['ship_date'], l['due_date'], l['debt_total'], l['doc_no'])
+        if not l['doc_no'] and k[:4] in numbered:
+            continue
+        if k in seen:
+            continue
+        seen.add(k)
+        dedup.append(l)
+    return facts, dedup, total
+
+
 @transaction.atomic
 def load_debt(fileobj, filename, user=None, force=False):
     h = _hash(fileobj)
@@ -331,25 +422,26 @@ def load_debt(fileobj, filename, user=None, force=False):
     def _cln(s):
         return str(s).replace('\xa0', ' ').strip() if s is not None else ''
 
-    # распознавание нового формата «по срокам долга»: в шапке колонка «Покупатель» (кол.B),
-    # а рядом в кол.A — «Менеджер…» или «Документ». Терпимо к регистру, пробелам и NBSP.
-    is_new = any(len(r) > 1 and _cln(r[1]).lower().startswith('покупател')
-                 and ('енеджер' in _cln(r[0]).lower() or 'окумент' in _cln(r[0]).lower())
-                 for r in rows[:12])
-    if is_new:
-        facts, lines, total = _parse_debt_new(rows, filename)
-    else:
+    # Разбираем послойно: сначала прежний формат (менеджер+реализации), затем универсальный
+    # (шапка где угодно, колонки по названиям), затем старый широкий. Первый непустой — берём.
+    facts, lines, total = _parse_debt_new(rows, filename)
+    if not facts:
+        facts, lines, total = _parse_debt_map(rows, filename)
+    if not facts:
         facts, lines, total = _parse_debt_old(rows)
     # ВАЖНО: не трогаем существующую дебиторку, пока разбор не дал непустой результат,
     # иначе кривой/чужой файл обнулит данные
     if not facts:
         import openpyxl as _op
+        # ищем строку-шапку с «Покупатель» в любой колонке — для диагностики
+        pos = next(((i, j) for i, r in enumerate(rows[:60]) for j, c in enumerate(r)
+                    if _cln(c).lower().startswith('покупател')), None)
         h0 = list(rows[0]) if rows else []
         prev = ' | '.join(_cln(x)[:16] for x in h0[:4]) if h0 else '—'
-        hdr_found = any(len(r) > 1 and _cln(r[1]).lower().startswith('покупател') for r in rows[:12])
         return {'skipped': True, 'reason': (
             f'Формат не распознан — данные не изменены. Диагностика: строк={len(rows)}, '
-            f'new={is_new}, шапка={hdr_found}, A1..D1=[{prev}], openpyxl={_op.__version__}')}
+            f'шапка_найдена={"да, строка "+str(pos[0])+" колонка "+str(pos[1]) if pos else "нет"}, '
+            f'A1..D1=[{prev}], openpyxl={_op.__version__}')}
     snap_date = facts[0].get('snapshot_date') or datetime.now().date()
     up = Upload.objects.create(kind='debt', filename=filename, file_hash=h, uploaded_by=user,
                                note=f'снимок {snap_date}')
