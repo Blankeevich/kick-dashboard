@@ -44,7 +44,7 @@
   .trash.over{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.07);border-style:solid;transform:translateX(-50%) translateY(0) scale(1.06)}
 </style>
 
-<div style="margin-bottom:10px"><a href="{% url 'projects' %}" class="link">← все проекты</a></div>
+<div style="margin-bottom:10px"><a href="{% url 'project' project.id %}" class="link">← к проекту «{{ project.name }}»</a></div>
 <div class="toolbar">
   <h2 style="margin:0;font-size:20px;border-left:4px solid {{ project.color }};padding-left:10px">{{ project.name }}</h2>
   <form method="get" class="filters" style="margin:0">

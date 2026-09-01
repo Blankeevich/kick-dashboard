@@ -1088,6 +1088,53 @@ def projects(request):
 
 
 @login_required
+def project(request, pid):
+    from .models import Project, ProjectNote, ProjectFile, TaskStage
+    from django.shortcuts import get_object_or_404, redirect
+    from collections import Counter
+    p = get_object_or_404(Project, pk=pid)
+    if request.method == 'POST':
+        act = request.POST.get('action')
+        if act == 'save_project':
+            p.name = (request.POST.get('name') or p.name).strip()
+            p.description = request.POST.get('description', '')
+            p.composition = request.POST.get('composition', '')
+            p.owner = request.POST.get('owner', '')
+            p.status = request.POST.get('status') or p.status
+            p.color = request.POST.get('color') or p.color
+            p.deadline = _pdate(request.POST.get('deadline'))
+            p.save()
+        elif act == 'add_note':
+            txt = (request.POST.get('text') or '').strip()
+            if txt:
+                ProjectNote.objects.create(project=p, text=txt, author=request.user.username)
+        elif act == 'del_note':
+            ProjectNote.objects.filter(pk=request.POST.get('nid'), project=p).delete()
+        elif act == 'add_file':
+            for f in request.FILES.getlist('files'):
+                ProjectFile.objects.create(project=p, file=f, name=f.name[:255], uploaded_by=request.user.username)
+        elif act == 'del_file':
+            pf = ProjectFile.objects.filter(pk=request.POST.get('fid'), project=p).first()
+            if pf:
+                pf.file.delete(save=False)
+                pf.delete()
+        return redirect('project', pid=pid)
+    stages = list(TaskStage.objects.all())
+    fracs = _stage_fracs(stages)
+    sids = list(p.tasks.values_list('stage_id', flat=True))
+    total = len(sids)
+    pct = round(sum(fracs.get(s, 0.0) for s in sids) / total * 100) if total else 0
+    done_ids = {s.id for s in stages if s.is_done}
+    cnt = Counter(sids)
+    stage_rows = [{'stage': s, 'n': cnt.get(s.id, 0)} for s in stages]
+    return render(request, 'dashboard/project.html', {
+        'page': 'projects', 'p': p, 'pct': pct, 'off': round(113 * (100 - pct) / 100),
+        'total': total, 'done': sum(1 for s in sids if s in done_ids),
+        'stage_rows': stage_rows, 'notes': list(p.notes.all()), 'files': list(p.files.all()),
+        'statuses': Project.STATUS, 'people': _task_people()})
+
+
+@login_required
 def project_board(request, pid):
     from .models import Project, Task, Client, Lead, TaskStage
     from django.shortcuts import get_object_or_404, redirect

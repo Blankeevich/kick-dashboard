@@ -1,0 +1,125 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block content %}
+<style>
+  .phead{display:flex;gap:18px;align-items:center;position:relative;overflow:hidden}
+  .phead::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--pc)}
+  .pring{position:relative;flex:none;width:70px;height:70px;display:grid;place-items:center}
+  .pring svg{transform:rotate(-90deg)}
+  .pring .pt{position:absolute;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+  .pmeta{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2);margin-top:7px}
+  .pmeta span{display:inline-flex;align-items:center;gap:5px}.pmeta i{font-size:15px}
+  .pgrid2{display:grid;grid-template-columns:1.15fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:900px){.pgrid2{grid-template-columns:1fr}}
+  .pcol{display:flex;flex-direction:column;gap:14px}
+  .ptxt{font-size:13.5px;line-height:1.5;color:var(--ink)}
+  .muted{font-size:12.5px;color:var(--ink2)}
+  .schips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+  .schip{font-size:11.5px;border-radius:8px;padding:4px 10px;background:var(--sf2);color:var(--ink);border-left:3px solid var(--sc);font-variant-numeric:tabular-nums}
+  .pbar{height:9px;background:var(--sf2);border-radius:5px;overflow:hidden}.pbar b{display:block;height:100%;background:var(--pu);border-radius:5px}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+  .fitem{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--sf2)}
+  .fitem img{width:100%;height:80px;object-fit:cover;display:block}
+  .ficon{height:80px;display:grid;place-items:center;color:var(--pu);font-size:30px;text-decoration:none}
+  .fname{font-size:10.5px;color:var(--ink2);padding:5px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fdel{position:absolute;top:4px;right:4px;width:20px;height:20px;border:0;border-radius:6px;background:rgba(20,20,26,.55);color:#fff;cursor:pointer;font-size:11px;line-height:1;display:grid;place-items:center}
+  .fdel:hover{background:var(--redb)}
+  .feed{display:flex;flex-direction:column;gap:10px}
+  .note{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--sf2)}
+  .nhead{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink2)}.nhead b{color:var(--ink);font-size:12px}
+  .ntext{font-size:13px;line-height:1.45;margin-top:5px}
+  .ta{width:100%;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;resize:vertical;background:var(--sf)}
+  .ta:focus{outline:none;border-color:var(--pu)}
+</style>
+
+<div style="margin-bottom:10px"><a href="{% url 'projects' %}" class="link">← все проекты</a></div>
+
+<div class="card wide phead" style="--pc:{{ p.color }}">
+  <div class="pring">
+    <svg width="70" height="70" viewBox="0 0 46 46">
+      <circle cx="23" cy="23" r="18" fill="none" stroke="var(--line)" stroke-width="5"></circle>
+      <circle cx="23" cy="23" r="18" fill="none" stroke="{{ p.color }}" stroke-width="5" stroke-linecap="round" stroke-dasharray="113" stroke-dashoffset="{{ off }}"></circle>
+    </svg>
+    <span class="pt">{{ pct }}%</span>
+  </div>
+  <div style="flex:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <h1 style="margin:0;font-size:24px;letter-spacing:-.02em">{{ p.name }}</h1>
+      <span class="pill" {% if p.status == 'archived' %}style="background:var(--sf2)"{% else %}style="background:rgba(47,168,79,.12);color:#2fa84f"{% endif %}>{{ p.get_status_display }}</span>
+    </div>
+    <div class="pmeta">
+      {% if p.deadline %}<span><i class="ti ti-calendar-event"></i> срок {{ p.deadline|date:"d.m.Y" }}</span>{% endif %}
+      {% if p.owner %}<span><i class="ti ti-user"></i> {{ p.owner }}</span>{% endif %}
+      <span><i class="ti ti-checklist"></i> {{ done }}/{{ total }} задач готово</span>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;flex:none">
+    <a class="btn" href="{% url 'project_board' p.id %}"><i class="ti ti-layout-kanban"></i> Доска задач</a>
+    <button class="perbtn" type="button" onclick="var d=document.getElementById('editp');d.open=true;d.scrollIntoView({behavior:'smooth'})"><i class="ti ti-edit"></i> Редактировать</button>
+  </div>
+</div>
+
+<details id="editp" class="card wide" style="margin:14px 0">
+  <summary style="cursor:pointer;font-weight:600;font-size:13px">Редактировать проект</summary>
+  <form method="post" style="margin-top:12px">{% csrf_token %}<input type="hidden" name="action" value="save_project">
+    <div class="cform">
+      <div class="two">
+        <div class="frow"><label>Название</label><input name="name" value="{{ p.name }}"></div>
+        <div class="frow"><label>Цвет</label><input name="color" type="color" value="{{ p.color }}" style="height:38px;padding:3px"></div>
+        <div class="frow"><label>Статус</label><select name="status">{% for c,l in statuses %}<option value="{{ c }}" {% if c == p.status %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+        <div class="frow"><label>Срок</label><input name="deadline" type="date" value="{{ p.deadline|date:'Y-m-d' }}"></div>
+        <div class="frow"><label>Ответственный</label><input name="owner" list="people" value="{{ p.owner }}"></div>
+      </div>
+      <div class="frow"><label>Описание</label><textarea name="description" rows="3">{{ p.description }}</textarea></div>
+      <div class="frow"><label>Состав / детали</label><textarea name="composition" rows="3">{{ p.composition }}</textarea></div>
+    </div>
+    <datalist id="people">{% for m in people %}<option value="{{ m }}">{% endfor %}</datalist>
+    <div style="margin-top:12px"><button class="btn" type="submit">Сохранить</button></div>
+  </form>
+</details>
+
+<section class="pgrid2">
+  <div class="pcol">
+    <div class="card" style="margin:0"><div class="ch"><span>Описание</span></div>
+      {% if p.description %}<div class="ptxt">{{ p.description|linebreaksbr }}</div>{% else %}<div class="muted">Нет описания — добавь через «Редактировать».</div>{% endif %}</div>
+    <div class="card" style="margin:0"><div class="ch"><span>Состав / детали</span></div>
+      {% if p.composition %}<div class="ptxt">{{ p.composition|linebreaksbr }}</div>{% else %}<div class="muted">Например: что входит в проект, состав рецептуры, спецификация.</div>{% endif %}</div>
+    <div class="card" style="margin:0"><div class="ch"><span>Задачи</span><a href="{% url 'project_board' p.id %}" class="link">открыть доску →</a></div>
+      <div class="pbar"><b style="width:{{ pct }}%"></b></div>
+      <div class="schips">{% for r in stage_rows %}<span class="schip" style="--sc:{{ r.stage.color }}">{{ r.stage.name }} · {{ r.n }}</span>{% empty %}<span class="muted">Нет этапов</span>{% endfor %}</div>
+    </div>
+  </div>
+  <div class="pcol">
+    <div class="card" style="margin:0"><div class="ch"><span>Файлы и фото</span><small>{{ files|length }}</small></div>
+      <form method="post" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">{% csrf_token %}<input type="hidden" name="action" value="add_file">
+        <input type="file" name="files" multiple style="font-size:12px"><button class="btn" type="submit" style="padding:7px 14px">Загрузить</button></form>
+      <div class="fgrid">
+        {% for f in files %}
+        <div class="fitem">
+          {% if f.is_image %}<a href="{{ f.file.url }}" target="_blank"><img src="{{ f.file.url }}" alt="{{ f.name }}"></a>
+          {% else %}<a href="{{ f.file.url }}" target="_blank" class="ficon"><i class="ti ti-file-text"></i></a>{% endif %}
+          <div class="fname" title="{{ f.name }}">{{ f.name|truncatechars:18 }}</div>
+          <form method="post" onsubmit="return confirm('Удалить файл?')">{% csrf_token %}<input type="hidden" name="action" value="del_file"><input type="hidden" name="fid" value="{{ f.id }}"><button class="fdel" type="submit">✕</button></form>
+        </div>
+        {% empty %}<div class="muted" style="grid-column:1/-1">Пока нет файлов. Загрузи фото макета, ТЗ, договор, картинки продукта.</div>{% endfor %}
+      </div>
+    </div>
+    <div class="card" style="margin:0"><div class="ch"><span>Комментарии и замечания</span><small>{{ notes|length }}</small></div>
+      <form method="post" style="margin-bottom:12px">{% csrf_token %}<input type="hidden" name="action" value="add_note">
+        <textarea class="ta" name="text" rows="2" placeholder="написать комментарий или замечание…"></textarea>
+        <div style="margin-top:8px"><button class="btn" type="submit" style="padding:7px 14px">Добавить</button></div>
+      </form>
+      <div class="feed">
+        {% for n in notes %}
+        <div class="note">
+          <div class="nhead"><b>{{ n.author|default:"—" }}</b><span>{{ n.created_at|date:"d.m.Y H:i" }}</span>
+            <form method="post" onsubmit="return confirm('Удалить комментарий?')" style="margin-left:auto">{% csrf_token %}<input type="hidden" name="action" value="del_note"><input type="hidden" name="nid" value="{{ n.id }}"><button class="fdel" type="submit" style="position:static">✕</button></form>
+          </div>
+          <div class="ntext">{{ n.text|linebreaksbr }}</div>
+        </div>
+        {% empty %}<div class="muted">Комментариев пока нет — оставь первый.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

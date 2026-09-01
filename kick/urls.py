@@ -1,5 +1,7 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
+from django.conf import settings
+from django.views.static import serve
 from django.views.decorators.csrf import csrf_exempt
 from dashboard import views, api, mcp
 
@@ -33,7 +35,8 @@ urlpatterns = [
     path('leads/<int:lead_id>/quick/', views.lead_quick, name='lead_quick'),
     path('leads/<int:lead_id>/', views.lead_card, name='lead_card'),
     path('projects/', views.projects, name='projects'),
-    path('projects/<int:pid>/', views.project_board, name='project_board'),
+    path('projects/<int:pid>/', views.project, name='project'),
+    path('projects/<int:pid>/board/', views.project_board, name='project_board'),
     path('tasks/stages/', views.task_stages, name='task_stages'),
     path('tasks/<int:tid>/move/', views.task_move, name='task_move'),
     path('tasks/<int:tid>/delete/', views.task_delete, name='task_delete'),
@@ -63,4 +66,5 @@ urlpatterns = [
     path('mcp/', mcp.endpoint),
     path('mcp/<key>/', mcp.endpoint),
     path('mcp/<key>', mcp.endpoint),
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]

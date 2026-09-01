@@ -41,7 +41,7 @@
 
 <div class="pgrid">
   {% for r in rows %}
-  <a class="pcard" href="{% url 'project_board' r.p.id %}" style="--pc:{{ r.p.color }}">
+  <a class="pcard" href="{% url 'project' r.p.id %}" style="--pc:{{ r.p.color }}">
     <div class="pring">
       <svg width="52" height="52" viewBox="0 0 46 46">
         <circle cx="23" cy="23" r="18" fill="none" stroke="var(--line)" stroke-width="5"></circle>

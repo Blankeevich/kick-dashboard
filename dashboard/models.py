@@ -433,7 +433,11 @@ class Project(models.Model):
     color = models.CharField('Цвет', max_length=9, default='#6d5bd0')
     status = models.CharField('Статус', max_length=10, choices=STATUS, default='active')
     order = models.IntegerField('Порядок', default=0)
+    deadline = models.DateField('Срок', null=True, blank=True)
+    owner = models.CharField('Ответственный', max_length=160, blank=True)
+    composition = models.TextField('Состав / детали', blank=True)
     created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
 
     class Meta:
         verbose_name = 'Проект'
@@ -486,6 +490,43 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ProjectNote(models.Model):
+    """Комментарий / замечание к проекту."""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='notes')
+    text = models.TextField('Текст')
+    author = models.CharField('Автор', max_length=120, blank=True)
+    created_at = models.DateTimeField('Когда', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Комментарий проекта'
+        verbose_name_plural = 'Комментарии проектов'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.text[:40]
+
+
+class ProjectFile(models.Model):
+    """Вложение (фото/файл) к проекту."""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='files')
+    file = models.FileField('Файл', upload_to='project_files/%Y/%m/')
+    name = models.CharField('Имя', max_length=255, blank=True)
+    uploaded_by = models.CharField('Загрузил', max_length=120, blank=True)
+    created_at = models.DateTimeField('Когда', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Файл проекта'
+        verbose_name_plural = 'Файлы проектов'
+        ordering = ['-created_at']
+
+    def is_image(self):
+        n = (self.name or self.file.name or '').lower()
+        return n.rsplit('.', 1)[-1] in ('jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp')
+
+    def __str__(self):
+        return self.name or self.file.name
 
 
 class PackagingItem(models.Model):
