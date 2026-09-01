@@ -257,7 +257,8 @@ def _parse_debt_new(rows, filename):
     m = re.search(r'на (\d{2})\.(\d{2})\.(\d{4})', filename)
     snap = datetime(int(m.group(3)), int(m.group(2)), int(m.group(1))).date() if m else None
     hdr = next((i for i, r in enumerate(rows)
-                if len(r) > 1 and r[1] and str(r[1]).strip() == 'Покупатель'), None)
+                if len(r) > 1 and r[1]
+                and str(r[1]).replace('\xa0', ' ').strip().lower().startswith('покупател')), None)
     if hdr is None:
         return [], [], 0
     facts, lines, total, cur = [], [], 0, None
@@ -326,9 +327,15 @@ def load_debt(fileobj, filename, user=None, force=False):
     if not force and Upload.objects.filter(kind='debt', file_hash=h).exists():
         return {'skipped': True, 'reason': 'Такой файл уже загружен'}
     rows = _read_rows(fileobj, filename)
-    # строгое распознавание нового формата: в шапке «Менеджер…» в кол.A и «Покупатель» в кол.B
-    is_new = any(len(r) > 1 and r[1] and str(r[1]).strip() == 'Покупатель'
-                 and r[0] and 'енеджер' in str(r[0]) for r in rows[:8])
+
+    def _cln(s):
+        return str(s).replace('\xa0', ' ').strip() if s is not None else ''
+
+    # распознавание нового формата «по срокам долга»: в шапке колонка «Покупатель» (кол.B),
+    # а рядом в кол.A — «Менеджер…» или «Документ». Терпимо к регистру, пробелам и NBSP.
+    is_new = any(len(r) > 1 and _cln(r[1]).lower().startswith('покупател')
+                 and ('енеджер' in _cln(r[0]).lower() or 'окумент' in _cln(r[0]).lower())
+                 for r in rows[:12])
     if is_new:
         facts, lines, total = _parse_debt_new(rows, filename)
     else:
@@ -336,7 +343,13 @@ def load_debt(fileobj, filename, user=None, force=False):
     # ВАЖНО: не трогаем существующую дебиторку, пока разбор не дал непустой результат,
     # иначе кривой/чужой файл обнулит данные
     if not facts:
-        return {'skipped': True, 'reason': 'Формат не распознан или нет строк — данные не изменены'}
+        import openpyxl as _op
+        h0 = list(rows[0]) if rows else []
+        prev = ' | '.join(_cln(x)[:16] for x in h0[:4]) if h0 else '—'
+        hdr_found = any(len(r) > 1 and _cln(r[1]).lower().startswith('покупател') for r in rows[:12])
+        return {'skipped': True, 'reason': (
+            f'Формат не распознан — данные не изменены. Диагностика: строк={len(rows)}, '
+            f'new={is_new}, шапка={hdr_found}, A1..D1=[{prev}], openpyxl={_op.__version__}')}
     snap_date = facts[0].get('snapshot_date') or datetime.now().date()
     up = Upload.objects.create(kind='debt', filename=filename, file_hash=h, uploaded_by=user,
                                note=f'снимок {snap_date}')
