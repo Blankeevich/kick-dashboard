@@ -373,26 +373,34 @@ def _parse_debt_map(rows, filename):
     def g(r, j):
         return r[j] if (j is not None and j < len(r)) else None
 
+    # префиксы строк-документов (это НЕ клиенты). Клиент в колонке A может соседствовать
+    # со строками «Реализация…», «Договор…», сроками «40/50» — их надо отличать по префиксу.
+    DOC_PFX = ('реализация', 'корректировка', 'отчет комисс', 'отчёт комисс')
+    SKIP_PFX = DOC_PFX + ('счет', 'счёт', 'договор', 'документ')
+
     facts, lines, total, cur = [], [], 0, None
     for r in rows[hdr + 1:]:
         raw_client = str(g(r, c_client)).replace('\xa0', ' ').strip() if g(r, c_client) is not None else ''
-        low_client = raw_client.lower()
+        low = raw_client.lower()
         man = str(g(r, c_manager)).replace('\xa0', ' ').strip() if (c_manager is not None and g(r, c_manager) is not None) else ''
         tot = _num(g(r, c_total))
-        # строка-клиент: имя в колонке «Покупатель», не «Итого», не подзаголовок корзин
-        if raw_client and low_client not in ('итого', 'покупатель', 'контрагент') \
-                and not low_client.startswith('до ') and 'дней' not in low_client:
+        is_doc = low.startswith(DOC_PFX) or man.lower().startswith(DOC_PFX)
+        # не клиент: пусто, «Итого»/шапка/корзины, документ/счёт/договор/срок, «40»/«50» (чисто число)
+        is_skip = (not raw_client) or low in ('итого', 'покупатель', 'контрагент') \
+            or low.startswith(SKIP_PFX) or low.startswith('до ') or 'дней' in low \
+            or low.replace('.', '').replace(',', '').replace(' ', '').isdigit()
+        if raw_client and not is_skip:                       # строка-КЛИЕНТ
             cur = raw_client
             if tot:
-                mgr = man if (c_manager is not None and man.lower() != 'документ' and 'реализац' not in man.lower()) else ''
+                mgr = man if (man and not man.lower().startswith(DOC_PFX) and man.lower() != 'документ') else ''
                 facts.append(dict(client=cur, manager=mgr, snapshot_date=snap,
                                   ship_date=_date(g(r, c_ship)), due_date=_date(g(r, c_due)),
                                   debt_total=int(tot), debt_overdue=int(_num(g(r, c_over)) or 0),
                                   overdue_days=int(_num(g(r, c_days)) or 0)))
                 total += int(tot)
-        # строка-документ под клиентом (есть колонка менеджер/документ, имя клиента пустое)
-        elif c_manager is not None and man and not raw_client and cur and tot and man.lower() != 'итого':
-            mno = re.search(r'№\s*(\S+)', man)
+        elif is_doc and cur and tot:                         # строка-ДОКУМЕНТ (реализация) под клиентом
+            src = raw_client if low.startswith(DOC_PFX) else man
+            mno = re.search(r'№\s*(\S+)', src)
             lines.append(dict(client=cur, doc_no=(mno.group(1) if mno else ''),
                               ship_date=_date(g(r, c_ship)), due_date=_date(g(r, c_due)),
                               debt_total=int(tot), debt_overdue=int(_num(g(r, c_over)) or 0),
@@ -466,9 +474,16 @@ def load_debt(fileobj, filename, user=None, force=False):
     DebtSnapshot.objects.update_or_create(
         date=snap_date, defaults={'total': total, 'overdue': overdue, 'count': len(facts)})
     DebtClientSnapshot.objects.filter(date=snap_date).delete()
+    # агрегируем по клиенту: у DebtClientSnapshot уникальность (дата, клиент) — если в файле
+    # клиент встречается несколько раз, суммируем, иначе UNIQUE-констрейнт даёт 500
+    by_client = {}
+    for f in facts:
+        a = by_client.setdefault(f['client'], [0, 0])
+        a[0] += f['debt_total']
+        a[1] += f['debt_overdue']
     DebtClientSnapshot.objects.bulk_create(
-        [DebtClientSnapshot(date=snap_date, client=f['client'],
-                            debt_total=f['debt_total'], debt_overdue=f['debt_overdue']) for f in facts],
+        [DebtClientSnapshot(date=snap_date, client=cl, debt_total=dt, debt_overdue=od)
+         for cl, (dt, od) in by_client.items()],
         batch_size=1000)
     # ретеншен: храним последние 120 снимков
     old = list(DebtSnapshot.objects.order_by('-date').values_list('date', flat=True)[120:])
