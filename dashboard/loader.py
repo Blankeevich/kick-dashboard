@@ -174,6 +174,18 @@ def load_sales_client(fileobj, filename, user=None, force=False):
             total += int(amt or 0)
         last_facts = cur
         last_kind = 'korr' if dt == 'Корректировка' else 'real' if dt == 'Реализация' else 'other'
+        # запасная привязка: основание зашито в самом номере корректировки —
+        # либо «ФРддммгг/К1» (срезаем /Кn), либо прямая ссылка на реализацию «ФРддммгг/8».
+        # Если следом идёт отдельная строка-основание — она перезапишет это ниже по циклу.
+        if dt == 'Корректировка' and dno:
+            base = re.sub(r'[/\-]?[KКkк]\d+$', '', dno)          # ФР200126/К1 → ФР200126
+            bdate = real_date.get(base) or real_date.get(dno) or _date_from_realno(base)
+            if bdate:
+                for f in cur:
+                    f.base_no = base
+                    if bdate.year == year:                       # в месяц отгрузки только в пределах года
+                        f.doc_date = bdate
+                        f.month = bdate.month
         if dt == 'Реализация' and dno:
             dd = _date(r[1])
             if dd:
