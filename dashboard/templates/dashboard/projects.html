@@ -1,0 +1,35 @@
+{% extends 'dashboard/base.html' %}{% load humanize %}
+{% block title %}Проекты{% endblock %}
+{% block content %}
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+  <div class="foot" style="border:0;padding:0;margin:0">Трекер задач по проектам. Клик по проекту — доска задач.</div>
+  <span style="flex:1"></span>
+  <button class="btn" type="button" onclick="var d=document.getElementById('addp');d.open=!d.open">+ Проект</button>
+</div>
+
+<details id="addp" class="card wide" style="margin-bottom:14px">
+  <summary style="cursor:pointer;font-weight:600;font-size:13px">Новый проект</summary>
+  <form method="post" style="margin-top:12px">{% csrf_token %}<input type="hidden" name="action" value="add_project">
+    <div class="cform"><div class="two">
+      <div class="frow"><label>Название *</label><input name="name" required></div>
+      <div class="frow"><label>Цвет</label><input name="color" type="color" value="#6d5bd0" style="height:38px;padding:3px"></div>
+    </div>
+    <div class="frow"><label>Описание</label><textarea name="description" rows="2"></textarea></div>
+    <div style="margin-top:12px"><button class="btn" type="submit">Создать</button></div>
+    </div>
+  </form>
+</details>
+
+<section class="grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+  {% for r in rows %}
+  <a class="card" href="{% url 'project_board' r.p.id %}" style="text-decoration:none;color:inherit;border-left:4px solid {{ r.p.color }}">
+    <div class="ch"><span>{{ r.p.name }}</span><small>{{ r.total }} задач</small></div>
+    {% if r.p.description %}<div style="font-size:12px;color:var(--ink2)">{{ r.p.description|truncatechars:90 }}</div>{% endif %}
+    <div class="mini" style="margin-top:12px"><b style="width:{{ r.pct }}%;background:{{ r.p.color }}"></b></div>
+    <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink2);margin-top:6px">
+      <span>Готово {{ r.done }}/{{ r.total }}</span><span>{{ r.pct }}%{% if r.doing %} · в работе {{ r.doing }}{% endif %}</span>
+    </div>
+  </a>
+  {% empty %}<div class="card"><div style="font-size:12px;color:var(--ink2)">Проектов пока нет. Создай первый — кнопка «+ Проект» сверху.</div></div>{% endfor %}
+</section>
+{% endblock %}

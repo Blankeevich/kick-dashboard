@@ -1,0 +1,26 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ t.title }}{% endblock %}
+{% block content %}
+<div style="margin-bottom:10px"><a href="{% url 'project_board' t.project_id %}" class="link">← к проекту «{{ t.project.name }}»</a></div>
+<form method="post" class="card" style="max-width:640px;margin:0">{% csrf_token %}
+  <div class="ch"><span>Задача</span><button class="btn" type="submit" style="padding:6px 16px">Сохранить</button></div>
+  <div class="cform">
+    <div class="frow"><label>Заголовок</label><input name="title" value="{{ t.title }}" required></div>
+    <div class="frow"><label>Описание</label><textarea name="description" rows="4">{{ t.description }}</textarea></div>
+    <div class="two">
+      <div class="frow"><label>Статус</label><select name="status">{% for c,l in statuses %}<option value="{{ c }}" {% if c == t.status %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="frow"><label>Приоритет</label><select name="priority">{% for c,l in priorities %}<option value="{{ c }}" {% if c == t.priority %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="frow"><label>Исполнитель</label><select name="assignee"><option value="">—</option>{% for m in people %}<option value="{{ m }}" {% if m == t.assignee %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></div>
+      <div class="frow"><label>…или новый сотрудник</label><input name="assignee_new" placeholder="новый исполнитель"></div>
+      <div class="frow"><label>Срок</label><input name="due_date" type="date" value="{{ t.due_date|date:'Y-m-d' }}"></div>
+      <div class="frow"><label>Клиент (привязка)</label><input name="client" list="cl" value="{{ t.client }}"></div>
+    </div>
+    <div class="frow"><label>Лид (привязка)</label><select name="lead"><option value="">—</option>{% for l in leads %}<option value="{{ l.id }}" {% if t.lead_id == l.id %}selected{% endif %}>{{ l.company }}</option>{% endfor %}</select></div>
+    <div class="foot">Создана {{ t.created_at|date:"d.m.Y" }}{% if t.done_at %} · выполнена {{ t.done_at|date:"d.m.Y" }}{% endif %}</div>
+  </div>
+  <datalist id="cl">{% for c in clients %}<option value="{{ c }}">{% endfor %}</datalist>
+</form>
+<form method="post" onsubmit="return confirm('Удалить задачу?')" style="margin-top:10px">{% csrf_token %}<input type="hidden" name="action" value="delete">
+  <button type="submit" style="background:none;border:0;color:var(--redb);cursor:pointer;font:inherit;font-size:12px;padding:0">Удалить задачу</button>
+</form>
+{% endblock %}

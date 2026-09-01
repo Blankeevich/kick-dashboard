@@ -425,6 +425,54 @@ class LeadLog(models.Model):
         return '%s %s %s' % (self.created_at, self.user, self.action)
 
 
+class Project(models.Model):
+    """Проект в трекере задач."""
+    STATUS = [('active', 'Активен'), ('archived', 'В архиве')]
+    name = models.CharField('Название', max_length=160, unique=True)
+    description = models.TextField('Описание', blank=True)
+    color = models.CharField('Цвет', max_length=9, default='#6d5bd0')
+    status = models.CharField('Статус', max_length=10, choices=STATUS, default='active')
+    order = models.IntegerField('Порядок', default=0)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Проект'
+        verbose_name_plural = 'Проекты'
+        ordering = ['order', '-created_at']
+
+    def __str__(self):
+        return self.name
+
+
+class Task(models.Model):
+    """Задача в проекте. Колонки канбана — по статусу."""
+    STATUSES = [('todo', 'Надо сделать'), ('doing', 'В работе'),
+                ('review', 'На проверке'), ('done', 'Готово')]
+    PRIORITY = [('low', 'Низкий'), ('med', 'Средний'), ('high', 'Высокий')]
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tasks', verbose_name='Проект')
+    title = models.CharField('Задача', max_length=255)
+    description = models.TextField('Описание', blank=True)
+    status = models.CharField('Статус', max_length=10, choices=STATUSES, default='todo', db_index=True)
+    priority = models.CharField('Приоритет', max_length=6, choices=PRIORITY, default='med')
+    assignee = models.CharField('Исполнитель', max_length=160, blank=True)
+    due_date = models.DateField('Срок', null=True, blank=True)
+    client = models.CharField('Клиент (привязка)', max_length=255, blank=True)
+    lead = models.ForeignKey('Lead', null=True, blank=True, on_delete=models.SET_NULL,
+                             related_name='tasks', verbose_name='Лид (привязка)')
+    order = models.IntegerField('Порядок', default=0)
+    created_at = models.DateTimeField('Создана', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлена', auto_now=True)
+    done_at = models.DateField('Выполнена', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Задача'
+        verbose_name_plural = 'Задачи (трекер)'
+        ordering = ['order', '-created_at']
+
+    def __str__(self):
+        return self.title
+
+
 class PackagingItem(models.Model):
     """Справочник упаковки: связь с батончиком (для расхода по продажам) + остаток."""
     upak = models.CharField('Упаковка', max_length=255, unique=True)

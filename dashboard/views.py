@@ -1018,3 +1018,131 @@ def logout_view(request):
     from django.shortcuts import redirect
     logout(request)
     return redirect('login')
+
+
+# ---------- Трекер задач / проектов ----------
+def _task_people():
+    from .models import SalesManager
+    return list(SalesManager.objects.filter(active=True).values_list('name', flat=True))
+
+
+def _resolve_assignee(request):
+    """Исполнитель: из выпадающего списка или новый — тогда заводим его в справочник."""
+    from .models import SalesManager
+    new = (request.POST.get('assignee_new') or '').strip()
+    if new:
+        SalesManager.objects.get_or_create(name=new)
+        return new
+    return (request.POST.get('assignee') or '').strip()
+
+
+@login_required
+def projects(request):
+    from .models import Project
+    from django.shortcuts import redirect
+    if request.method == 'POST' and request.POST.get('action') == 'add_project':
+        name = (request.POST.get('name') or '').strip()
+        if name:
+            Project.objects.get_or_create(name=name, defaults={
+                'description': request.POST.get('description', ''),
+                'color': request.POST.get('color') or '#6d5bd0'})
+        return redirect('projects')
+    rows = []
+    for p in Project.objects.all():
+        ts = p.tasks.all()
+        total = ts.count()
+        done = ts.filter(status='done').count()
+        rows.append({'p': p, 'total': total, 'done': done,
+                     'doing': ts.filter(status='doing').count(),
+                     'pct': round(done / total * 100) if total else 0})
+    return render(request, 'dashboard/projects.html', {'page': 'projects', 'rows': rows})
+
+
+@login_required
+def project_board(request, pid):
+    from .models import Project, Task, Client, Lead
+    from django.shortcuts import get_object_or_404, redirect
+    p = get_object_or_404(Project, pk=pid)
+    if request.method == 'POST' and request.POST.get('action') == 'add_task':
+        title = (request.POST.get('title') or '').strip()
+        if title:
+            Task.objects.create(project=p, title=title,
+                description=request.POST.get('description', ''),
+                status=request.POST.get('status') or 'todo',
+                priority=request.POST.get('priority') or 'med',
+                assignee=_resolve_assignee(request),
+                due_date=_pdate(request.POST.get('due_date')),
+                client=request.POST.get('client', ''),
+                lead_id=(request.POST.get('lead') or None))
+        return redirect('project_board', pid=pid)
+    afilter = request.GET.get('assignee') or ''
+    tq = p.tasks.all()
+    if afilter:
+        tq = tq.filter(assignee=afilter)
+    cols = [{'code': code, 'label': label, 'items': list(tq.filter(status=code))}
+            for code, label in Task.STATUSES]
+    for c in cols:
+        c['n'] = len(c['items'])
+    return render(request, 'dashboard/project_board.html', {
+        'page': 'projects', 'project': p, 'cols': cols, 'today': date.today(),
+        'people': _task_people(), 'sel_assignee': afilter,
+        'clients': list(Client.objects.values_list('name', flat=True)[:500]),
+        'leads': list(Lead.objects.filter(converted=False).order_by('company')[:300]),
+        'priorities': Task.PRIORITY, 'statuses': Task.STATUSES})
+
+
+@login_required
+def task_move(request, tid):
+    from .models import Task
+    from django.http import JsonResponse
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+    try:
+        t = Task.objects.get(pk=tid)
+    except Task.DoesNotExist:
+        return JsonResponse({'ok': False}, status=404)
+    st = request.POST.get('status')
+    if st in {c for c, _ in Task.STATUSES}:
+        t.status = st
+        t.done_at = date.today() if st == 'done' else None
+        t.save(update_fields=['status', 'done_at', 'updated_at'])
+        return JsonResponse({'ok': True})
+    return JsonResponse({'ok': False}, status=400)
+
+
+@login_required
+def task_card(request, tid):
+    from .models import Task, Client, Lead
+    from django.shortcuts import get_object_or_404, redirect
+    t = get_object_or_404(Task, pk=tid)
+    if request.method == 'POST':
+        if request.POST.get('action') == 'delete':
+            pid = t.project_id
+            t.delete()
+            return redirect('project_board', pid=pid)
+        t.title = (request.POST.get('title') or t.title).strip()
+        t.description = request.POST.get('description', '')
+        t.status = request.POST.get('status') or t.status
+        t.priority = request.POST.get('priority') or t.priority
+        t.assignee = _resolve_assignee(request) or t.assignee
+        t.due_date = _pdate(request.POST.get('due_date'))
+        t.client = request.POST.get('client', '')
+        t.lead_id = request.POST.get('lead') or None
+        t.done_at = date.today() if t.status == 'done' else None
+        t.save()
+        return redirect('project_board', pid=t.project_id)
+    return render(request, 'dashboard/task_card.html', {
+        'page': 'projects', 't': t, 'people': _task_people(),
+        'clients': list(Client.objects.values_list('name', flat=True)[:500]),
+        'leads': list(Lead.objects.order_by('company')[:300]),
+        'priorities': Task.PRIORITY, 'statuses': Task.STATUSES})
+
+
+@login_required
+def task_delete(request, tid):
+    from .models import Task
+    from django.http import JsonResponse
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+    Task.objects.filter(pk=tid).delete()
+    return JsonResponse({'ok': True})
