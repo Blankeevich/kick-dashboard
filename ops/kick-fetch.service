@@ -1,0 +1,10 @@
+[Unit]
+Description=KICK: забор выгрузок 1С из почты
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/kick-dashboard
+ExecStart=/opt/kick-dashboard/ops/run_fetch_mail.sh

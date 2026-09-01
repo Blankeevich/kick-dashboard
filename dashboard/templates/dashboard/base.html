@@ -33,6 +33,8 @@ body{margin:0;background:#f5f5f7;font:100%/1.5 'Geist','Inter',system-ui,-apple-
 .beta{font-size:9px;font-weight:600;letter-spacing:.02em;color:var(--pu);background:var(--pu2);border-radius:5px;padding:1px 5px;margin-left:4px;vertical-align:middle}
 .usr{margin-top:auto;font-size:12px;color:var(--ink2)}
 .usr a{color:var(--pu);text-decoration:none}
+.vbadge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--pu);background:var(--pu2);border-radius:7px;padding:3px 8px;margin-bottom:7px}
+.vbadge i{font-size:13px}
 .main{padding:0 22px 22px;min-width:0}
 .top{position:sticky;top:0;z-index:2;padding:16px 0 12px;background:rgba(245,245,247,.85);backdrop-filter:blur(16px);display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .eyebrow{font-size:11.5px;letter-spacing:.02em;color:var(--ink2)}
@@ -195,7 +197,7 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,.n
 </style>
 </head>
 <body>
-<script>if(localStorage.getItem('kick_theme')==='dark')document.body.classList.add('dark');</script>
+<script>if(localStorage.getItem('kick_theme')==='dark')document.body.classList.add('dark');{% if is_viewer %}document.body.classList.add('viewer');{% endif %}</script>
 <div class="app">
   <aside class="side">
     <div class="brand"><span class="klogo klogo-side" role="img" aria-label="KICK YOUR ENERGY"></span><div class="bs" style="margin-top:5px">Панель управления</div></div>
@@ -223,6 +225,7 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,.n
     </nav>
     <div class="usr">
       <button class="themebtn" id="themeToggle" type="button"><i class="ti ti-moon" id="themeIcon"></i> <span id="themeLabel">Тёмная тема</span></button>
+      {% if is_viewer %}<span class="vbadge"><i class="ti ti-eye"></i> Только просмотр</span><br>{% endif %}
       {{ request.user.username }}<br><a href="{% url 'logout' %}">Выйти</a>
     </div>
   </aside>
@@ -329,6 +332,18 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,.n
       document.body.classList.remove('nav-open');
     }
   });
+})();
+</script>
+<script>
+/* Режим «только просмотр»: прячем всё, что меняет данные (кнопки — для удобства,
+   серверный запрет всё равно стоит в ReadOnlyMiddleware). */
+(function(){
+  if(!document.body.classList.contains('viewer'))return;
+  function isPost(f){return f && (f.getAttribute('method')||'get').toLowerCase()==='post';}
+  document.querySelectorAll('form').forEach(function(f){ if(isPost(f)) f.style.display='none'; });
+  document.querySelectorAll('details').forEach(function(d){ if(isPost(d.querySelector('form'))) d.style.display='none'; });
+  document.querySelectorAll('[onclick]').forEach(function(el){ if(/\.open\b/.test(el.getAttribute('onclick')||'')) el.style.display='none'; });
+  document.querySelectorAll('[draggable="true"]').forEach(function(el){ el.setAttribute('draggable','false'); el.style.cursor='default'; });
 })();
 </script>
 </body>

@@ -1,0 +1,10 @@
+[Unit]
+Description=KICK: проверять почту и подсасывать выгрузки 1С
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
