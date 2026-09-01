@@ -34,6 +34,7 @@ urlpatterns = [
     path('leads/<int:lead_id>/', views.lead_card, name='lead_card'),
     path('projects/', views.projects, name='projects'),
     path('projects/<int:pid>/', views.project_board, name='project_board'),
+    path('tasks/stages/', views.task_stages, name='task_stages'),
     path('tasks/<int:tid>/move/', views.task_move, name='task_move'),
     path('tasks/<int:tid>/delete/', views.task_delete, name='task_delete'),
     path('tasks/<int:tid>/', views.task_card, name='task_card'),

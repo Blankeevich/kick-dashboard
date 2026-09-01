@@ -444,17 +444,32 @@ class Project(models.Model):
         return self.name
 
 
+class TaskStage(models.Model):
+    """Настраиваемый этап — колонка канбана трекера (общий для всех проектов)."""
+    name = models.CharField('Название этапа', max_length=80)
+    order = models.IntegerField('Порядок', default=0)
+    color = models.CharField('Цвет', max_length=9, default='#6d5bd0')
+    is_done = models.BooleanField('Выполнено (для прогресса)', default=False)
+
+    class Meta:
+        verbose_name = 'Этап задач'
+        verbose_name_plural = 'Этапы задач'
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.name
+
+
 class Task(models.Model):
-    """Задача в проекте. Колонки канбана — по статусу."""
-    STATUSES = [('todo', 'Надо сделать'), ('doing', 'В работе'),
-                ('review', 'На проверке'), ('done', 'Готово')]
+    """Задача в проекте. Колонки канбана — настраиваемые этапы (TaskStage)."""
     PRIORITY = [('low', 'Низкий'), ('med', 'Средний'), ('high', 'Высокий')]
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tasks', verbose_name='Проект')
     title = models.CharField('Задача', max_length=255)
     description = models.TextField('Описание', blank=True)
-    status = models.CharField('Статус', max_length=10, choices=STATUSES, default='todo', db_index=True)
+    stage = models.ForeignKey(TaskStage, null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name='tasks', verbose_name='Этап')
     priority = models.CharField('Приоритет', max_length=6, choices=PRIORITY, default='med')
-    assignee = models.CharField('Исполнитель', max_length=160, blank=True)
+    assignees = models.ManyToManyField('SalesManager', blank=True, related_name='tasks', verbose_name='Исполнители')
     due_date = models.DateField('Срок', null=True, blank=True)
     client = models.CharField('Клиент (привязка)', max_length=255, blank=True)
     lead = models.ForeignKey('Lead', null=True, blank=True, on_delete=models.SET_NULL,

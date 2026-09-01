@@ -1,0 +1,39 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Этапы задач{% endblock %}
+{% block content %}
+<div style="margin-bottom:12px"><a href="{% url 'projects' %}" class="link">← к проектам</a></div>
+
+<div class="card wide" style="margin-bottom:14px">
+  <div class="ch"><span>Этапы (колонки доски)</span><small>порядок слева направо по числу · общие для всех проектов</small></div>
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="save">
+    <table>
+      <thead><tr><th style="width:56px">Цвет</th><th>Название</th><th style="width:90px">Порядок</th><th style="width:120px">Колонка «готово»</th><th style="width:80px"></th></tr></thead>
+      <tbody>
+        {% for s in stages %}
+        <tr>
+          <td><input name="color_{{ s.id }}" type="color" value="{{ s.color }}" style="width:40px;height:32px;border:1px solid var(--line);border-radius:8px;padding:2px;cursor:pointer;background:var(--sf)"></td>
+          <td><input name="name_{{ s.id }}" value="{{ s.name }}" style="width:100%;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px"></td>
+          <td><input name="order_{{ s.id }}" type="number" value="{{ s.order }}" style="width:70px;font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 9px"></td>
+          <td><label style="font-size:12px;color:var(--ink2)"><input type="checkbox" name="done_{{ s.id }}" {% if s.is_done %}checked{% endif %}> считать выполненной</label></td>
+          <td>{% if stages|length > 1 %}<button form="delf{{ s.id }}" type="submit" onclick="return confirm('Удалить этап «{{ s.name|escapejs }}»? Задачи из него станут без этапа.')" style="background:none;border:0;color:var(--redb);cursor:pointer;font:inherit;font-size:12px;padding:0">удалить</button>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="margin-top:12px"><button class="btn" type="submit">Сохранить</button></div>
+  </form>
+  <div class="foot">Отметка «колонка готово» нужна, чтобы прогресс проекта считал задачи из этой колонки выполненными. Порядок задаёт, как идут колонки.</div>
+</div>
+
+{% for s in stages %}<form method="post" id="delf{{ s.id }}">{% csrf_token %}<input type="hidden" name="action" value="delete"><input type="hidden" name="sid" value="{{ s.id }}"></form>{% endfor %}
+
+<div class="card wide">
+  <div class="ch"><span>Добавить этап</span></div>
+  <form method="post" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">{% csrf_token %}<input type="hidden" name="action" value="add">
+    <div class="frow" style="min-width:240px"><label>Название нового этапа</label>
+      <input name="name" required style="font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:8px 10px"></div>
+    <div class="frow"><label>Цвет</label><input name="color" type="color" value="#6d5bd0" style="height:38px;padding:3px;border:1px solid var(--line);border-radius:8px"></div>
+    <button class="btn" type="submit">Добавить</button>
+  </form>
+</div>
+{% endblock %}

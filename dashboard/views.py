@@ -1026,14 +1026,21 @@ def _task_people():
     return list(SalesManager.objects.filter(active=True).values_list('name', flat=True))
 
 
-def _resolve_assignee(request):
-    """Исполнитель: из выпадающего списка или новый — тогда заводим его в справочник."""
+def _resolve_assignees(request):
+    """Исполнители: выбранные из мультиселекта + новые (через запятую) — новых заводим в справочник."""
     from .models import SalesManager
-    new = (request.POST.get('assignee_new') or '').strip()
-    if new:
-        SalesManager.objects.get_or_create(name=new)
-        return new
-    return (request.POST.get('assignee') or '').strip()
+    names = [n.strip() for n in request.POST.getlist('assignees') if n.strip()]
+    for raw in (request.POST.get('assignees_new') or '').replace(';', ',').split(','):
+        nm = raw.strip()
+        if nm:
+            SalesManager.objects.get_or_create(name=nm)
+            names.append(nm)
+    return list(SalesManager.objects.filter(name__in=set(names)))
+
+
+def _first_stage():
+    from .models import TaskStage
+    return TaskStage.objects.order_by('order', 'id').first()
 
 
 @login_required
@@ -1051,44 +1058,49 @@ def projects(request):
     for p in Project.objects.all():
         ts = p.tasks.all()
         total = ts.count()
-        done = ts.filter(status='done').count()
-        rows.append({'p': p, 'total': total, 'done': done,
-                     'doing': ts.filter(status='doing').count(),
-                     'pct': round(done / total * 100) if total else 0})
+        done = ts.filter(stage__is_done=True).count()
+        pct = round(done / total * 100) if total else 0
+        rows.append({'p': p, 'total': total, 'done': done, 'doing': total - done,
+                     'pct': pct, 'off': round(113 * (100 - pct) / 100)})
     return render(request, 'dashboard/projects.html', {'page': 'projects', 'rows': rows})
 
 
 @login_required
 def project_board(request, pid):
-    from .models import Project, Task, Client, Lead
+    from .models import Project, Task, Client, Lead, TaskStage
     from django.shortcuts import get_object_or_404, redirect
     p = get_object_or_404(Project, pk=pid)
+    stages = list(TaskStage.objects.all())
     if request.method == 'POST' and request.POST.get('action') == 'add_task':
         title = (request.POST.get('title') or '').strip()
         if title:
-            Task.objects.create(project=p, title=title,
+            sid = request.POST.get('stage') or (stages[0].id if stages else None)
+            t = Task.objects.create(project=p, title=title,
                 description=request.POST.get('description', ''),
-                status=request.POST.get('status') or 'todo',
+                stage_id=sid,
                 priority=request.POST.get('priority') or 'med',
-                assignee=_resolve_assignee(request),
                 due_date=_pdate(request.POST.get('due_date')),
                 client=request.POST.get('client', ''),
                 lead_id=(request.POST.get('lead') or None))
+            t.assignees.set(_resolve_assignees(request))
         return redirect('project_board', pid=pid)
     afilter = request.GET.get('assignee') or ''
-    tq = p.tasks.all()
+    tq = p.tasks.all().prefetch_related('assignees')
     if afilter:
-        tq = tq.filter(assignee=afilter)
-    cols = [{'code': code, 'label': label, 'items': list(tq.filter(status=code))}
-            for code, label in Task.STATUSES]
-    for c in cols:
-        c['n'] = len(c['items'])
+        tq = tq.filter(assignees__name=afilter).distinct()
+    buckets = {s.id: [] for s in stages}
+    first_id = stages[0].id if stages else None
+    for t in tq:
+        sid = t.stage_id if t.stage_id in buckets else first_id
+        if sid in buckets:
+            buckets[sid].append(t)
+    cols = [{'stage': s, 'items': buckets[s.id], 'n': len(buckets[s.id])} for s in stages]
     return render(request, 'dashboard/project_board.html', {
         'page': 'projects', 'project': p, 'cols': cols, 'today': date.today(),
-        'people': _task_people(), 'sel_assignee': afilter,
+        'people': _task_people(), 'sel_assignee': afilter, 'stages': stages,
         'clients': list(Client.objects.values_list('name', flat=True)[:500]),
         'leads': list(Lead.objects.filter(converted=False).order_by('company')[:300]),
-        'priorities': Task.PRIORITY, 'statuses': Task.STATUSES})
+        'priorities': Task.PRIORITY})
 
 
 @login_required
@@ -1101,13 +1113,15 @@ def task_move(request, tid):
         t = Task.objects.get(pk=tid)
     except Task.DoesNotExist:
         return JsonResponse({'ok': False}, status=404)
-    st = request.POST.get('status')
-    if st in {c for c, _ in Task.STATUSES}:
-        t.status = st
-        t.done_at = date.today() if st == 'done' else None
-        t.save(update_fields=['status', 'done_at', 'updated_at'])
-        return JsonResponse({'ok': True})
-    return JsonResponse({'ok': False}, status=400)
+    from .models import TaskStage
+    try:
+        st = TaskStage.objects.get(pk=request.POST.get('stage'))
+    except (TaskStage.DoesNotExist, ValueError, TypeError):
+        return JsonResponse({'ok': False}, status=400)
+    t.stage = st
+    t.done_at = date.today() if st.is_done else None
+    t.save(update_fields=['stage', 'done_at', 'updated_at'])
+    return JsonResponse({'ok': True})
 
 
 @login_required
@@ -1120,22 +1134,26 @@ def task_card(request, tid):
             pid = t.project_id
             t.delete()
             return redirect('project_board', pid=pid)
+        from .models import TaskStage
         t.title = (request.POST.get('title') or t.title).strip()
         t.description = request.POST.get('description', '')
-        t.status = request.POST.get('status') or t.status
+        t.stage_id = request.POST.get('stage') or None
         t.priority = request.POST.get('priority') or t.priority
-        t.assignee = _resolve_assignee(request) or t.assignee
         t.due_date = _pdate(request.POST.get('due_date'))
         t.client = request.POST.get('client', '')
         t.lead_id = request.POST.get('lead') or None
-        t.done_at = date.today() if t.status == 'done' else None
+        t.done_at = date.today() if (t.stage_id and TaskStage.objects.filter(pk=t.stage_id, is_done=True).exists()) else None
         t.save()
+        t.assignees.set(_resolve_assignees(request))
         return redirect('project_board', pid=t.project_id)
+    from .models import TaskStage
     return render(request, 'dashboard/task_card.html', {
         'page': 'projects', 't': t, 'people': _task_people(),
+        'sel_assignees': list(t.assignees.values_list('name', flat=True)),
+        'stages': list(TaskStage.objects.all()),
         'clients': list(Client.objects.values_list('name', flat=True)[:500]),
         'leads': list(Lead.objects.order_by('company')[:300]),
-        'priorities': Task.PRIORITY, 'statuses': Task.STATUSES})
+        'priorities': Task.PRIORITY})
 
 
 @login_required
@@ -1146,3 +1164,31 @@ def task_delete(request, tid):
         return JsonResponse({'ok': False}, status=405)
     Task.objects.filter(pk=tid).delete()
     return JsonResponse({'ok': True})
+
+
+@login_required
+def task_stages(request):
+    from .models import TaskStage
+    from django.shortcuts import redirect
+    if request.method == 'POST':
+        act = request.POST.get('action')
+        if act == 'add':
+            nm = (request.POST.get('name') or '').strip()
+            if nm:
+                TaskStage.objects.create(name=nm, order=TaskStage.objects.count(),
+                                         color=request.POST.get('color') or '#6d5bd0')
+        elif act == 'delete':
+            TaskStage.objects.filter(pk=request.POST.get('sid')).delete()
+        elif act == 'save':
+            for s in TaskStage.objects.all():
+                s.name = (request.POST.get('name_%d' % s.id) or s.name).strip() or s.name
+                s.color = request.POST.get('color_%d' % s.id) or s.color
+                try:
+                    s.order = int(request.POST.get('order_%d' % s.id))
+                except (TypeError, ValueError):
+                    pass
+                s.is_done = ('done_%d' % s.id) in request.POST
+                s.save()
+        return redirect('task_stages')
+    return render(request, 'dashboard/task_stages.html',
+                  {'page': 'projects', 'stages': list(TaskStage.objects.all())})
