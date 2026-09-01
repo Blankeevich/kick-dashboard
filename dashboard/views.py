@@ -1043,6 +1043,24 @@ def _first_stage():
     return TaskStage.objects.order_by('order', 'id').first()
 
 
+def _stage_fracs(stages):
+    """Доля прогресса каждого этапа. Растёт линейно слева направо до «финиша»
+    (последней колонки «готово»); колонки после финиша (напр. «Заблокировано») = 0 — не прогресс."""
+    n = len(stages)
+    if n == 0:
+        return {}
+    finish = max((i for i, s in enumerate(stages) if s.is_done), default=n - 1)
+    fr = {}
+    for i, s in enumerate(stages):
+        if s.is_done:
+            fr[s.id] = 1.0
+        elif i <= finish:
+            fr[s.id] = (i / finish) if finish > 0 else 0.0
+        else:
+            fr[s.id] = 0.0
+    return fr
+
+
 @login_required
 def projects(request):
     from .models import Project
@@ -1054,12 +1072,16 @@ def projects(request):
                 'description': request.POST.get('description', ''),
                 'color': request.POST.get('color') or '#6d5bd0'})
         return redirect('projects')
+    from .models import TaskStage
+    stages = list(TaskStage.objects.all())
+    fracs = _stage_fracs(stages)
+    done_ids = {s.id for s in stages if s.is_done}
     rows = []
     for p in Project.objects.all():
-        ts = p.tasks.all()
-        total = ts.count()
-        done = ts.filter(stage__is_done=True).count()
-        pct = round(done / total * 100) if total else 0
+        sids = list(p.tasks.values_list('stage_id', flat=True))
+        total = len(sids)
+        pct = round(sum(fracs.get(sid, 0.0) for sid in sids) / total * 100) if total else 0
+        done = sum(1 for sid in sids if sid in done_ids)
         rows.append({'p': p, 'total': total, 'done': done, 'doing': total - done,
                      'pct': pct, 'off': round(113 * (100 - pct) / 100)})
     return render(request, 'dashboard/projects.html', {'page': 'projects', 'rows': rows})
@@ -1088,15 +1110,20 @@ def project_board(request, pid):
     tq = p.tasks.all().prefetch_related('assignees')
     if afilter:
         tq = tq.filter(assignees__name=afilter).distinct()
+    fracs = _stage_fracs(stages)
     buckets = {s.id: [] for s in stages}
     first_id = stages[0].id if stages else None
     for t in tq:
         sid = t.stage_id if t.stage_id in buckets else first_id
         if sid in buckets:
             buckets[sid].append(t)
-    cols = [{'stage': s, 'items': buckets[s.id], 'n': len(buckets[s.id])} for s in stages]
+    cols = [{'stage': s, 'items': buckets[s.id], 'n': len(buckets[s.id]),
+             'frac': fracs.get(s.id, 0.0)} for s in stages]
+    b_total = sum(c['n'] for c in cols)
+    progress = round(sum(c['n'] * c['frac'] for c in cols) / b_total * 100) if b_total else 0
     return render(request, 'dashboard/project_board.html', {
         'page': 'projects', 'project': p, 'cols': cols, 'today': date.today(),
+        'progress': progress, 'b_total': b_total,
         'people': _task_people(), 'sel_assignee': afilter, 'stages': stages,
         'clients': list(Client.objects.values_list('name', flat=True)[:500]),
         'leads': list(Lead.objects.filter(converted=False).order_by('company')[:300]),
