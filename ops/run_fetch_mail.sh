@@ -11,4 +11,4 @@ set +a
 while IFS= read -r kv; do
   [ -n "$kv" ] && export "$kv"
 done < <(systemctl show kick -p Environment --value 2>/dev/null | tr ' ' '\n')
-exec venv/bin/python manage.py fetch_mail
+exec venv/bin/python manage.py fetch_mail "$@"
