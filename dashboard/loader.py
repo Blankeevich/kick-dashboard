@@ -509,12 +509,22 @@ def load_debt(fileobj, filename, user=None, force=False):
 
 # ---------- Снимок упаковки (обновление остатков с сайта) ----------
 def pack_key(name):
-    """Нормализованный ключ имени из снимка упаковки — для сопоставления с справочником."""
+    """Жёсткий ключ (убирает скобки/пунктуацию) — запасной вариант сопоставления."""
     s = str(name or '').replace('\xa0', ' ').strip().lower()
     s = re.sub(r'^\d+\s*', '', s)
     s = s.replace('упаковка', '').replace('"', '')
     s = re.sub(r'\(.*?\)', '', s)
     s = re.sub(r'[^а-яёa-z0-9 ]', ' ', s)
+    return re.sub(r'\s+', ' ', s).strip()
+
+
+def snap_norm(name):
+    """Мягкая нормализация имени из снимка: убираем ведущие номера строк 1С, слова
+    'упаковка'/'батончик', кавычки — но СОХРАНЯЕМ отличители (Молдова/Дубай/2-6/5-22 и т.п.),
+    чтобы основной товар не схлопывался с экспортными вариантами. Это и есть snap_key."""
+    s = str(name or '').replace('\xa0', ' ').replace('ё', 'е').lower().strip()
+    s = re.sub(r'^[\d\s]+', '', s)                       # ведущие номера строк меняются от снимка к снимку
+    s = s.replace('"', ' ').replace('упаковка', ' ').replace('батончики', ' ').replace('батончик', ' ')
     return re.sub(r'\s+', ' ', s).strip()
 
 
@@ -543,12 +553,15 @@ def load_packaging_snapshot(fileobj, filename, user=None):
         num = _num(val)
         if num is None:
             continue
-        k = pack_key(a)
-        if k:
-            stock_by_key[k] = int(num)
+        # кладём остаток и под мягкий ключ (snap_norm), и под жёсткий (pack_key);
+        # «первый выигрывает» — основной товар идёт в файле раньше экспортных вариантов,
+        # поэтому его остаток не перетирается Молдовой/Дубаем/арабским
+        for k in (snap_norm(a), pack_key(a)):
+            if k and k not in stock_by_key:
+                stock_by_key[k] = int(num)
     updated, missed = 0, []
     for it in PackagingItem.objects.all():
-        key = it.snap_key or pack_key(it.upak)
+        key = it.snap_key or snap_norm(it.upak) or pack_key(it.upak)
         if key in stock_by_key:
             it.stock = stock_by_key[key]
             it.save(update_fields=['stock'])
